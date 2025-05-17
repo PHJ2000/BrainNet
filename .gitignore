@@ -1,0 +1,12 @@
+node_modules
+.env
+__pycache__
+*.py[cod]
+*.sqlite3
+.env*
+.idea
+.vscode
+.mypy_cache
+dist
+coverage
+.DS_Store
