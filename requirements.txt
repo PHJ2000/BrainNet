@@ -1,0 +1,4 @@
+fastapi[all]
+python-multipart
+python-jose
+passlib[bcrypt]
