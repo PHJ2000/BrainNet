@@ -1,3 +1,4 @@
+# backend/app/routers/projects.py
 import uuid
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, Path, Query, HTTPException, status
