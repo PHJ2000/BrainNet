@@ -1,3 +1,4 @@
+# backend/app/db/__init__.py
 from .store import USERS, PROJECTS, NODES, TAGS, USER_PROJECT_MAP, \
                    PROJECT_MEMBER_MAP, NODE_TAG_MAP, \
                    VOTES, PROJECT_HISTORY, INVITES
