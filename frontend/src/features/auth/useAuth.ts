@@ -18,6 +18,14 @@ export const useAuth = () => {
   };
 
   const handleRegister = async (email: string, password: string, name?: string) => {
+
+    if (!email || !email.includes("@") || !password) {
+    setError("이메일과 비밀번호를 올바르게 입력해주세요.");
+    return;
+  }
+
+  console.log("📦 register payload:", { email, password, name }); // ← 여기
+
     try {
       await register(email, password, name);
       await handleLogin(email, password); // 자동 로그인
