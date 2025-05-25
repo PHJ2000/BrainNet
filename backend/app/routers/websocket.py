@@ -1,3 +1,4 @@
+# backend/app/routers/websocket.py
 from fastapi import APIRouter, WebSocket, Query
 from jose import jwt, JWTError
 from app.core.security import SECRET_KEY, ALGORITHM

@@ -1,3 +1,4 @@
+# backend/app/routers/debug.py
 from fastapi import APIRouter, Depends
 from app.core.security import get_current_user_id
 from app.db import store as db

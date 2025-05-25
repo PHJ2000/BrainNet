@@ -1,3 +1,4 @@
+# backend/app/routers/nodes.py
 import uuid, random
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, Query, Path, HTTPException, status
