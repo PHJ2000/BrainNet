@@ -11,16 +11,40 @@ from app.utils.helpers   import ensure_member as _m, ensure_owner as _o, \
                                get_node as _n, get_tag as _t
 from app.utils.time      import utc_now as _now
 from app.db              import store as db
+import re,openai
 
 router = APIRouter(prefix="/projects/{project_id}/nodes", tags=["Nodes"])
 
+openai.api_key = ""
 # ── 내부 유틸: AI Ghost Stub ────────────────────────────────────────────
 def _gen_ai_nodes(project_id: str, prompt: str):
     nodes=[]
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "당신은 창의적인 아이디어를 제공하는 도우미입니다."},
+                {"role": "user", "content": f"다음 주제와 관련된 아이디어를 문장 형태로 두 개 작성해줘: {prompt}"}
+            ],
+            max_tokens=256,
+            temperature=0.7,
+        )
+        answer = response.choices[0].message.content.strip()# 메시지 파싱
+        
+        ideas = [s for s in re.split(r'\n+', answer) if s]
+
+        
+        ideas = ideas[:2]
+        cleaned_ideas = [re.sub(r'^\d+\.\s*', '', n) for n in ideas] # 숫자 기호 제거.
+
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())  # 전체 예외 스택을 콘솔에 출력
+        raise HTTPException(status_code=500, detail=str(e))
     for i in range(2):
         nid=f"node_{uuid.uuid4().hex[:6]}"
         node={
-            "id":nid,"project_id":project_id,"content":f"AI 제안 {i+1}",
+            "id":nid,"project_id":project_id,"content":f"{cleaned_ideas[i]}",
             "status":"GHOST","x":random.uniform(200,400),"y":random.uniform(200,400),
             "depth":0,"order":i,"authors":[]
         }
