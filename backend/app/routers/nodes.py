@@ -11,14 +11,15 @@ from app.utils.helpers   import ensure_member as _m, ensure_owner as _o, \
                                get_node as _n, get_tag as _t
 from app.utils.time      import utc_now as _now
 from app.db              import store as db
-import re,openai
+import re, openai, os
 
 router = APIRouter(prefix="/projects/{project_id}/nodes", tags=["Nodes"])
 
-openai.api_key = ""
+openai.api_key = os.getenv("OPENAI_API_KEY")
 # ── 내부 유틸: AI Ghost Stub ────────────────────────────────────────────
 def _gen_ai_nodes(project_id: str, prompt: str):
     nodes=[]
+    print(os.getenv("OPENAI_API_KEY"))
     try:
         response = openai.chat.completions.create(
             model="gpt-3.5-turbo",

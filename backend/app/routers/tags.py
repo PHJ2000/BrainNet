@@ -10,7 +10,9 @@ from app.utils.helpers   import ensure_member as _m, ensure_owner as _o, \
                                get_node as _n, get_tag as _t
 from app.utils.time      import utc_now as _now
 from app.db              import store as db
-import re,openai
+import re, openai, os
+
+openai.api_key = os.getenv("OPENAI_API_KEY")
 
 router = APIRouter(prefix="/projects/{project_id}/tags", tags=["Tags"])
 
