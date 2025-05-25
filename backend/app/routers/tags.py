@@ -10,6 +10,7 @@ from app.utils.helpers   import ensure_member as _m, ensure_owner as _o, \
                                get_node as _n, get_tag as _t
 from app.utils.time      import utc_now as _now
 from app.db              import store as db
+import re,openai
 
 router = APIRouter(prefix="/projects/{project_id}/tags", tags=["Tags"])
 
@@ -89,5 +90,27 @@ def refresh_summary(project_id: str, tag_id: str,
     nodes = [db.NODES[nid] for nid in db.NODE_TAG_MAP
              if tag_id in db.NODE_TAG_MAP[nid] and
                 db.NODES[nid]["project_id"]==project_id]
-    tag["summary"]="\n".join(n["content"] for n in nodes[:3]) or "(empty)"
+    tag["summary"]=_create_summary("\n".join(n["content"] for n in nodes[:3])) or "(empty)"
+
     return tag
+
+
+def _create_summary(contents: str):
+    
+    try:
+        response = openai.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "당신은 문장들을 요약해야합니다."},
+                {"role": "user", "content": f"주어지는 문장들을 2~3개 정도의 문장으로 요약해줘: {contents}"}
+            ],
+            max_tokens=256,
+            temperature=0.7,
+        )
+        answer = response.choices[0].message.content.strip()# 메시지 파싱
+        
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())  # 전체 예외 스택을 콘솔에 출력
+        raise HTTPException(status_code=500, detail=str(e))
+    return answer
