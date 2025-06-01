@@ -20,5 +20,6 @@ class Node(Base):
     order = Column(Integer, default=0)
     status = Column(String, default="inactive")
     ai_prompt = Column(String)
+    parent_id = Column(String)
 
     project = relationship("Project", backref="nodes")

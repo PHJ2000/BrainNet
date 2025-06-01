@@ -13,8 +13,8 @@ services:
       context: .
       dockerfile: backend/Dockerfile
     environment:
-      # DATABASE_URL: postgresql+asyncpg://brain:pass@db:5432/brainshare
       DATABASE_URL: postgresql+asyncpg://brain:pass@db:5432/brainshare
+      OPENAI_API_KEY : ${OPENAI_API_KEY}
       OPENAI_API_KEY : ${OPENAI_API_KEY}
     depends_on: [db]
     ports: ["8000:8000"]

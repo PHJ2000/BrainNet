@@ -9,6 +9,7 @@ class NodeCreate(BaseModel):
     depth: Optional[int] = 0
     order: Optional[int] = 0
     ai_prompt: Optional[str] = None
+    parent_id: Optional[str] = None
 
 class NodeUpdate(BaseModel):
     content: Optional[str] = None
@@ -27,3 +28,4 @@ class NodeOut(BaseModel):
     depth: int
     order: int
     tags: List[str] = []
+    parent_id: Optional[str] =None
