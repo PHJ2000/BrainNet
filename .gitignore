@@ -3,7 +3,7 @@ node_modules
 __pycache__
 *.py[cod]
 *.sqlite3
-.env*
+.env
 .idea
 .vscode
 .mypy_cache
