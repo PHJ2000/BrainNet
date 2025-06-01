@@ -19,7 +19,7 @@ services:
     ports: ["8000:8000"]
     volumes:
       - ./backend/app:/app/app
-    command: poetry run uvicorn app.main:app --host 0.0.0.0 --reload
+    # command: poetry run uvicorn app.main:app --host 0.0.0.0 --reload
   frontend:
     build:
       context: .

@@ -1,10 +1,9 @@
-# backend/Dockerfile
-
-# Python 이미지 선택
 FROM python:3.12-slim
 
-# 작업 디렉토리
 WORKDIR /app
+
+# postgresql-client 설치
+RUN apt-get update && apt-get install -y postgresql-client libpq-dev && rm -rf /var/lib/apt/lists/*
 
 # 루트에서 pyproject.toml, poetry.lock 복사
 COPY pyproject.toml poetry.lock* /app/
@@ -16,12 +15,15 @@ RUN pip install -U pip poetry && poetry install --no-root
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
+# startup.sh 복사
+COPY backend/startup.sh /app/
+RUN chmod +x /app/startup.sh
+
 # 전체 백엔드 앱 복사
 COPY backend/app /app/app
 
-# 실행 명령 또는 CMD는 필요에 따라 작성
-CMD ["poetry", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# alembic 폴더 및 설정 파일 복사
+COPY backend/alembic /app/alembic
+COPY backend/alembic.ini /app/alembic.ini
 
-
-
-
+CMD ["/app/startup.sh"]

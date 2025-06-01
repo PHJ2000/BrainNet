@@ -4,7 +4,7 @@
 docker compose up --build -d
 
 ## container제거
-docker compose down --remove-orphans
+docker compose down --volumes --remove-orphans
 
 ## 중지 및 재시작
 docker compose stop
