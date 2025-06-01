@@ -1,4 +1,3 @@
-# backend/app/routers/nodes.py
 import uuid, random
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, Query, Path, HTTPException, status
@@ -12,20 +11,21 @@ from app.utils.helpers   import ensure_member as _m, ensure_owner as _o, \
                                get_node as _n, get_tag as _t
 from app.utils.time      import utc_now as _now
 from app.db              import store as db
-import re,openai
+import re, openai, os
 
 router = APIRouter(prefix="/projects/{project_id}/nodes", tags=["Nodes"])
 
-openai.api_key = ""
+openai.api_key = os.getenv("OPENAI_API_KEY")
 # ── 내부 유틸: AI Ghost Stub ────────────────────────────────────────────
 def _gen_ai_nodes(project_id: str, prompt: str):
     nodes=[]
+    print(os.getenv("OPENAI_API_KEY"))
     try:
         response = openai.chat.completions.create(
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "당신은 창의적인 아이디어를 제공하는 도우미입니다."},
-                {"role": "user", "content": f"다음 주제와 관련된 아이디어를 문장 형태로 두 개 작성해줘: {prompt}"}
+                {"role": "user", "content": f"다음 주제와 관련된 새로운 아이디어를 문장 형태로 두 개 작성해줘: {prompt}"}
             ],
             max_tokens=256,
             temperature=0.7,
@@ -76,10 +76,15 @@ def create_node(body: NodeCreate, project_id: str, uid: str = Depends(_uid)):
     node={
         "id":nid,"project_id":project_id,"content":body.content,"status":"ACTIVE",
         "x":body.x or 0.0,"y":body.y or 0.0,"depth":body.depth or 0,"order":body.order or 0,
-        "authors":[uid]
+        "authors":[uid], "parent_id": body.parent_id or None
     }
     db.NODES[nid]=node
-    db.NODE_TAG_MAP[nid]=[]
+    #만약 부모노드가 태그를 가지고 있다면, 자식 노드도 동일한 태그가 있어야한다.
+    if body.parent_id is None:
+        db.NODE_TAG_MAP[nid] = []
+    else:
+        db.NODE_TAG_MAP[nid] = db.NODE_TAG_MAP[body.parent_id]
+    
     return node
 
 @router.patch("/{node_id}", response_model=NodeOut)
