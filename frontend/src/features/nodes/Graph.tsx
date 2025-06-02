@@ -3,209 +3,180 @@
 import { useEffect, useRef, useState } from "react";
 import cytoscape, { Core, ElementDefinition } from "cytoscape";
 import { v4 as uuidv4 } from "uuid";
-import { fetchNodes, createNode } from "./nodeApi";
+import { createAINodes as apiCreateAINodes } from "./nodeApi"; // ⬅️ 별칭!
 
-type NodeMeta = {
+/* ───────────── 타입 ───────────── */
+export type NodeMeta = {
   id: string;
   label: string;
   x: number;
   y: number;
   parentId?: string;
-  opacity?: number;
+  opacity?: number;           // 1(active) | 0.3(ghost)
   frozen?: boolean;
+  status?: "ACTIVE" | "GHOST";
+  generated?: boolean;        // 자식 제안 이미 만들었는지
 };
 
-type GraphProps = {
-  projectId: string;
-};
+export interface GraphProps { projectId: string; }
 
+/* ──────────── 컴포넌트 ─────────── */
 export default function Graph({ projectId }: GraphProps) {
-  const cyRef = useRef<HTMLDivElement>(null);
-  const cyInstance = useRef<Core | null>(null);
+  const cyRef        = useRef<HTMLDivElement>(null);
+  const cyInstance   = useRef<Core | null>(null);
+  const [nodes, setNodes] = useState<NodeMeta[]>([{
+    id: "root",
+    label: "주제를 입력하세요",
+    x: 300, y: 300,
+    opacity: 1,
+    status: "ACTIVE",
+    frozen: false,
+  }]);
+  const nodesRef = useRef(nodes);
+  useEffect(() => { nodesRef.current = nodes; }, [nodes]);
 
-  const [nodes, setNodes] = useState<NodeMeta[]>([]);
-  const nodesRef = useRef<NodeMeta[]>(nodes);
+  /* ───────── util ───────── */
+  const radius = 150;
+  const polarToXY = (cx:number, cy:number, r:number, rad:number) =>
+    ({ x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) });
 
-  useEffect(() => {
-    nodesRef.current = nodes;
-  }, [nodes]);
-
-  const addToCy = (elements: NodeMeta[]) => {
-    const cy = cyInstance.current;
-    if (!cy) return;
-
-    const newEles: ElementDefinition[] = elements.flatMap((node) => [
+  const addToCy = (arr: NodeMeta[]) => {
+    const cy = cyInstance.current; if (!cy) return;
+    const eles: ElementDefinition[] = arr.flatMap(n => [
       {
-        data: {
-          id: node.id,
-          label: node.label,
-          opacity: node.opacity ?? 1,
-        },
-        position: { x: node.x, y: node.y },
+        data: { id: n.id, label: n.label },
+        position: { x: n.x, y: n.y },
+        style: { opacity: n.opacity ?? 1 },
       },
-      ...(node.parentId
-        ? [
-            {
-              data: {
-                id: `e-${node.parentId}-${node.id}`,
-                source: node.parentId,
-                target: node.id,
-              },
-            },
-          ]
+      ...(n.parentId
+        ? [{ data:{ id:`e-${n.parentId}-${n.id}`, source:n.parentId, target:n.id }}]
         : []),
     ]);
-
-    console.log("🧹 Adding to Cytoscape:", newEles);
-
-    cy.add(newEles);
-    cy.fit();
+    cy.add(eles);
   };
 
-  const handleCreateInitialNode = async () => {
-    const word = prompt("최착 아이디어를 입력하세요:");
-    if (!word) return;
+  /* ─── GHOST → ACTIVE 확정 ─── */
+  const activateNode = async (n: NodeMeta) => {
+    n.opacity = 1; n.status = "ACTIVE"; n.frozen = true;
+    cyInstance.current?.$id(n.id).style("opacity", 1);
+    // TODO(선택): await fetch(`/projects/${projectId}/nodes/${n.id}/activate`, { method:"POST", credentials:"include" });
+  };
 
-    const newNode = {
-      id: uuidv4(),
-      label: word,
-      x: 300,
-      y: 300,
-      opacity: 1,
-      frozen: true,
-    };
+  /* ─── 자식 제안 생성 ─── */
+  const spawnChildren = async (parent: NodeMeta) => {
+    if (parent.generated) return;               // 중복 방지
+    const isRoot = !parent.parentId;
+    const childCnt = isRoot ? 3 : 2;
+    const aiCnt    = isRoot ? 2 : 1;
+    const blankCnt = childCnt - aiCnt;
 
-    await createNode(projectId, {
-      content: word,
-      x: newNode.x,
-      y: newNode.y,
-      depth: 0,
-      order: 0,
+    /* 각도 배열 계산 */
+    const angles: number[] = [];
+    if (isRoot) {
+      const base = -Math.PI/2;                 // 90° 위쪽부터
+      for (let i=0;i<3;i++) angles.push(base + i*2*Math.PI/3); // 0·120·240°
+    } else {
+      const gp = nodesRef.current.find(x=>x.id===parent.parentId);
+      const dir = gp ? Math.atan2(parent.y-gp.y, parent.x-gp.x) : 0;
+      angles.push(dir - Math.PI/6, dir + Math.PI/6);           // ±30°
+    }
+
+    /* 1) AI 제안 노드 fetch (필요 수만큼) */
+    const aiGhosts: NodeMeta[] = [];
+    try {
+      const res = await apiCreateAINodes(projectId, parent.label||"", parent.x, parent.y, 0, 0);
+      // (res as any[]).slice(0, aiCnt).forEach((srv, i) => {
+      const response = Array.isArray(res) ? res.slice(0, aiCnt) : [];
+      for (let i = 0; i < aiCnt; i++) {
+        const srv = response[i];  // 없으면 undefined
+        const { x, y } = polarToXY(parent.x, parent.y, radius, angles[i]);
+        aiGhosts.push({
+          id:    srv?.id    ?? uuidv4(),
+          label: srv?.content ?? `AI 제안 ${i+1}`,
+          x, y,
+          parentId: parent.id,
+          opacity: 0.3,
+          status: "GHOST",
+          frozen: false,
+        });
+      // });
+      }
+    } catch(e){ console.error(e); }
+
+    /* 2) 빈 노드 */
+    const blanks: NodeMeta[] = Array.from({length: blankCnt}, (_,i)=>{
+      const idx = aiCnt+i; const {x,y}=polarToXY(parent.x,parent.y,radius,angles[idx]);
+      return {
+        id: uuidv4(),
+        label: "?",
+        x, y,
+        parentId: parent.id,
+        opacity: 0.3,
+        status: "GHOST",
+        frozen: false,
+      };
     });
 
-    setNodes([newNode]);
-    nodesRef.current = [newNode];
-    addToCy([newNode]);
+    const children = [...aiGhosts, ...blanks];
+    setNodes(p => { const next=[...p, ...children]; nodesRef.current=next; return next; });
+    addToCy(children);
+
+    parent.frozen = true;
+    parent.generated = true;
   };
 
-  useEffect(() => {
-    if (!cyRef.current) return;
+  /* ─── 클릭 핸들러 ─── */
+  const handleTap = async (e: cytoscape.EventObject) => {
+    const id = e.target.id();
+    const cur = nodesRef.current.find(n=>n.id===id);
+    if (!cur) return;
 
+    if (cur.status==="GHOST") {                // 제안 확정
+      await activateNode(cur);
+      return;
+    }
+    if (cur.generated) return;                // 이미 확장됨
+    // ── (NEW) 노드 라벨 편집 ──
+    const newLabel = window.prompt("이 노드의 문장을 입력하세요", cur.label);
+    if (!newLabel) return;                    // 취소면 종료
+    cur.label = newLabel;
+    cyInstance.current?.$id(id).data("label", newLabel);
+
+    await spawnChildren(cur);                 // 자식 3개 만들기
+  };
+
+  /* ─── Cytoscape init ─── */
+  useEffect(()=>{ if(!cyRef.current) return;
     const cy = cytoscape({
       container: cyRef.current,
       elements: [],
-      layout: { name: "preset" },
-      style: [
-        {
-          selector: "node",
-          style: {
-            "background-color": "#0074D9",
-            label: "data(label)",
-            opacity: "data(opacity)" as any,
-            color: "white",
-            "text-valign": "center",
-            "text-halign": "center",
-            width: 40,
-            height: 40,
-            "font-size": 12,
-          },
-        },
-        {
-          selector: "edge",
-          style: {
-            width: 2,
-            "line-color": "#ccc",
-            "target-arrow-color": "#ccc",
-            "target-arrow-shape": "triangle",
-            "curve-style": "bezier",
-          },
-        },
+      layout: { name:"preset" },
+      style:[
+        { selector:"node", style:{
+            "background-color":"#0074D9",
+            "label":"data(label)",
+            "color":"#fff",
+            "text-valign":"center",
+            "text-halign":"center",
+            "font-size":12,
+            "opacity":"data(opacity)" as any,
+        }},
+        { selector:"edge", style:{
+            width:2, "line-color":"#ccc",
+            "target-arrow-color":"#ccc","target-arrow-shape":"triangle",
+            "curve-style":"bezier",
+        }},
       ],
     });
-
     cyInstance.current = cy;
+    addToCy(nodesRef.current);
+    cy.on("tap","node",handleTap);
 
-    const load = async () => {
-      const raw = await fetchNodes(projectId);
-      const formatted = raw.map((n: any) => ({
-        id: n.id,
-        label: n.content,
-        x: n.x,
-        y: n.y,
-        opacity: n.status === "ACTIVE" ? 1 : 0.3,
-        frozen: n.status === "ACTIVE",
-        parentId: null,
-      }));
+    // spawnChildren(nodesRef.current[0]).catch(console.error);
 
-      console.log("📦 formatted nodes", formatted);
+    return ()=>{cy.destroy();};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[]);
 
-      setNodes(formatted);
-      nodesRef.current = formatted;
-      addToCy(formatted);
-    };
-
-    load();
-
-    cy.on("tap", "node", async (evt) => {
-      const node = evt.target;
-      const id = node.id();
-      const currentNode = nodesRef.current.find((n) => n.id === id);
-      if (!currentNode || currentNode.frozen) return;
-
-      const word = prompt("노드 내용을 입력하세요:");
-      if (!word) return;
-
-      const newNode = {
-        id: uuidv4(),
-        label: word,
-        x: currentNode.x + 100,
-        y: currentNode.y + 50,
-        parentId: currentNode.id,
-        opacity: 1,
-        frozen: true,
-      };
-
-      await createNode(projectId, {
-        content: word,
-        x: newNode.x,
-        y: newNode.y,
-        depth: 0,
-        order: 0,
-      });
-
-      setNodes((prev) => [...prev, newNode]);
-      nodesRef.current.push(newNode);
-      addToCy([newNode]);
-    });
-
-    return () => {
-      cy.destroy();
-    };
-  }, [projectId]);
-
-  return (
-    <div style={{ position: "relative", width: "100%", height: "600px" }}>
-      <div
-        ref={cyRef}
-        style={{ position: "absolute", top: 0, left: 0, right: 0, bottom: 0 }}
-      />
-      {nodes.length === 0 && (
-        <button
-          onClick={handleCreateInitialNode}
-          style={{
-            position: "absolute",
-            top: "50%",
-            left: "50%",
-            transform: "translate(-50%, -50%)",
-            backgroundColor: "#2563eb",
-            color: "white",
-            padding: "8px 16px",
-            borderRadius: "4px",
-          }}
-        >
-          + 아이디어 추가
-        </button>
-      )}
-    </div>
-  );
-} 
+  return <div ref={cyRef} style={{width:"100%",height:"600px"}}/>;
+}
