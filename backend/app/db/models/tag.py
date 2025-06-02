@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, Text, ForeignKey
 from sqlalchemy.orm import relationship
 import uuid
 from .project import Base
-
+from app.db.models.base import Base
 class Tag(Base):
     __tablename__ = "tags"
 

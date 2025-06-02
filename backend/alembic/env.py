@@ -1,6 +1,6 @@
 import sys
 import os
-
+from app.db.models import Base
 # [1] 상위 경로 추가 (중요!)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 

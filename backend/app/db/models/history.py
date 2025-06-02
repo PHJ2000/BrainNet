@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, Text, DateTime, ForeignKey
 from datetime import datetime
 import uuid
 from .project import Base
-
+from app.db.models.base import Base
 class History(Base):
     __tablename__ = "history"
 

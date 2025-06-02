@@ -4,7 +4,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 from .user import Base
-
+from app.db.models.base import Base
 class Project(Base):
     __tablename__ = "projects"
 

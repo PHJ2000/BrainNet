@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, Float, Integer, ForeignKey, Enum
 from sqlalchemy.orm import relationship
 import uuid
 from .project import Base
-
+from app.db.models.base import Base
 class NodeStatusEnum(str):
     ACTIVE = "active"
     INACTIVE = "inactive"

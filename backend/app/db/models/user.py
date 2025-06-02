@@ -3,7 +3,7 @@ from sqlalchemy import Column, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 import uuid
 from datetime import datetime
-
+from app.db.models.base import Base
 Base = declarative_base()
 
 class User(Base):
