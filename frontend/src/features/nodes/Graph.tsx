@@ -1,182 +1,382 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, memo } from "react";
 import cytoscape, { Core, ElementDefinition } from "cytoscape";
 import { v4 as uuidv4 } from "uuid";
-import { createAINodes as apiCreateAINodes } from "./nodeApi"; // ⬅️ 별칭!
+import { createAINodes as apiCreateAINodes } from "./nodeApi"; // AI 노드
+import {
+  listTags,
+  attachTag,
+  detachTag,
+  createTag,
+} from "@/features/projects/tagApi"; // 태그 API
+import {
+  Menu,
+  Item,
+  Submenu,
+  useContextMenu,
+} from "react-contexify";
+import "react-contexify/ReactContexify.css";
 
 /* ───────────── 타입 ───────────── */
+export interface Tag {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  node_count: number;
+  summary?: string;
+}
+
 export type NodeMeta = {
   id: string;
   label: string;
   x: number;
   y: number;
   parentId?: string;
-  opacity?: number;           // 1(active) | 0.3(ghost)
+  opacity?: number;
   frozen?: boolean;
   status?: "ACTIVE" | "GHOST";
-  generated?: boolean;        // 자식 제안 이미 만들었는지
+  generated?: boolean;
+  tags?: string[];            // ⬅️ 태그 id 배열
 };
 
-export interface GraphProps { projectId: string; }
+export interface GraphProps {
+  projectId: string;
+}
 
-/* ──────────── 컴포넌트 ─────────── */
+/* ──────────── Context-menu 컴포넌트 ─────────── */
+const NODE_MENU_ID = "node-ctx";
+
+interface CtxProps {
+  nodeId: string | null;
+  tags: Tag[];
+  nodeTags: string[];
+  onAdd: (tid: string) => void;
+  onRemove: (tid: string) => void;
+}
+
+const NodeContextMenu = memo(function NodeContextMenu({
+  nodeId,
+  tags,
+  nodeTags,
+  onAdd,
+  onRemove,
+}: CtxProps) {
+  return (
+    <Menu id={NODE_MENU_ID} animation="fade">
+      <Submenu label="태그 달기…">
+        {tags.map((t) => (
+          <Item key={t.id} disabled={nodeTags.includes(t.id)} onClick={() => onAdd(t.id)}>
+            {t.name}
+          </Item>
+        ))}
+        <Item onClick={() => onAdd("__new__")}>+ 새 태그</Item>
+      </Submenu>
+
+      {nodeTags.length > 0 && (
+        <Submenu label="태그 떼기…">
+          {nodeTags.map((tid) => {
+            const tg = tags.find((t) => t.id === tid);
+            return (
+              <Item key={tid} onClick={() => onRemove(tid)}>
+                {tg?.name ?? tid}
+              </Item>
+            );
+          })}
+        </Submenu>
+      )}
+    </Menu>
+  );
+});
+
+function useNodeMenu() {
+  const { show } = useContextMenu({ id: NODE_MENU_ID });
+  return show;
+}
+
+/* ──────────── 그래프 컴포넌트 ─────────── */
 export default function Graph({ projectId }: GraphProps) {
-  const cyRef        = useRef<HTMLDivElement>(null);
-  const cyInstance   = useRef<Core | null>(null);
-  const [nodes, setNodes] = useState<NodeMeta[]>([{
-    id: "root",
-    label: "주제를 입력하세요",
-    x: 300, y: 300,
-    opacity: 1,
-    status: "ACTIVE",
-    frozen: false,
-  }]);
-  const nodesRef = useRef(nodes);
-  useEffect(() => { nodesRef.current = nodes; }, [nodes]);
+  const cyRef = useRef<HTMLDivElement>(null);
+  const cyInstance = useRef<Core | null>(null);
 
-  /* ───────── util ───────── */
+  /* ----- 상태 ----- */
+  const [nodes, setNodes] = useState<NodeMeta[]>([
+    {
+      id: "root",
+      label: "주제를 입력하세요",
+      x: 300,
+      y: 300,
+      opacity: 1,
+      status: "ACTIVE",
+    },
+  ]);
+  const nodesRef = useRef(nodes);
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
+
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [ctxNodeId, setCtxNodeId] = useState<string | null>(null);
+  const showMenu = useNodeMenu();
+
+  /* ----- 태그 초기 로드 ----- */
+  useEffect(() => {
+    listTags(projectId)
+      .then(setTags)
+      .catch((e) => console.error("listTags", e));
+  }, [projectId]);
+
+  /* ----- util ----- */
   const radius = 150;
-  const polarToXY = (cx:number, cy:number, r:number, rad:number) =>
-    ({ x: cx + r * Math.cos(rad), y: cy + r * Math.sin(rad) });
+  const polarToXY = (cx: number, cy: number, r: number, rad: number) => ({
+    x: cx + r * Math.cos(rad),
+    y: cy + r * Math.sin(rad),
+  });
 
   const addToCy = (arr: NodeMeta[]) => {
-    const cy = cyInstance.current; if (!cy) return;
-    const eles: ElementDefinition[] = arr.flatMap(n => [
+    const cy = cyInstance.current;
+    if (!cy) return;
+    const eles: ElementDefinition[] = arr.flatMap((n) => [
       {
         data: { id: n.id, label: n.label },
         position: { x: n.x, y: n.y },
         style: { opacity: n.opacity ?? 1 },
       },
       ...(n.parentId
-        ? [{ data:{ id:`e-${n.parentId}-${n.id}`, source:n.parentId, target:n.id }}]
+        ? [
+            {
+              data: {
+                id: `e-${n.parentId}-${n.id}`,
+                source: n.parentId,
+                target: n.id,
+              },
+            },
+          ]
         : []),
     ]);
     cy.add(eles);
   };
 
-  /* ─── GHOST → ACTIVE 확정 ─── */
-  const activateNode = async (n: NodeMeta) => {
-    n.opacity = 1; n.status = "ACTIVE"; n.frozen = true;
-    cyInstance.current?.$id(n.id).style("opacity", 1);
-    // TODO(선택): await fetch(`/projects/${projectId}/nodes/${n.id}/activate`, { method:"POST", credentials:"include" });
-  };
+  /* ----- 태그 attach / detach ----- */
+  const handleAddTag = async (tagId: string) => {
+    if (!ctxNodeId) return;
+    let realId = tagId;
 
-  /* ─── 자식 제안 생성 ─── */
-  const spawnChildren = async (parent: NodeMeta) => {
-    if (parent.generated) return;               // 중복 방지
-    const isRoot = !parent.parentId;
-    const childCnt = isRoot ? 3 : 2;
-    const aiCnt    = isRoot ? 2 : 1;
-    const blankCnt = childCnt - aiCnt;
-
-    /* 각도 배열 계산 */
-    const angles: number[] = [];
-    if (isRoot) {
-      const base = -Math.PI/2;                 // 90° 위쪽부터
-      for (let i=0;i<3;i++) angles.push(base + i*2*Math.PI/3); // 0·120·240°
-    } else {
-      const gp = nodesRef.current.find(x=>x.id===parent.parentId);
-      const dir = gp ? Math.atan2(parent.y-gp.y, parent.x-gp.x) : 0;
-      angles.push(dir - Math.PI/6, dir + Math.PI/6);           // ±30°
+    if (tagId === "__new__") {
+      const name = window.prompt("새 태그 이름");
+      if (!name) return;
+      try {
+        const t = await createTag(projectId, { name });
+        setTags((ts) => [...ts, t]);
+        realId = t.id;
+      } catch (e) {
+        console.error(e);
+        return;
+      }
     }
 
-    /* 1) AI 제안 노드 fetch (필요 수만큼) */
+    try {
+      await attachTag(projectId, realId, ctxNodeId);
+      setNodes((ns) =>
+        ns.map((n) =>
+          n.id === ctxNodeId
+            ? { ...n, tags: [...(n.tags ?? []), realId] }
+            : n
+        )
+      );
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const handleRemoveTag = async (tagId: string) => {
+    if (!ctxNodeId) return;
+    try {
+      await detachTag(projectId, tagId, ctxNodeId);
+      setNodes((ns) =>
+        ns.map((n) =>
+          n.id === ctxNodeId
+            ? { ...n, tags: (n.tags ?? []).filter((t) => t !== tagId) }
+            : n
+        )
+      );
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  /* ----- AI, 자식 노드 생성 로직 (기존) ----- */
+  const spawnChildren = async (parent: NodeMeta) => {
+    if (parent.generated) return;
+    const isRoot = !parent.parentId;
+    const childCnt = isRoot ? 3 : 2;
+    const aiCnt = isRoot ? 2 : 1;
+    const angles: number[] = [];
+    if (isRoot) {
+      const base = -Math.PI / 2;
+      for (let i = 0; i < 3; i++) angles.push(base + (i * 2 * Math.PI) / 3);
+    } else {
+      const gp = nodesRef.current.find((x) => x.id === parent.parentId);
+      const dir = gp ? Math.atan2(parent.y - gp.y, parent.x - gp.x) : 0;
+      angles.push(dir - Math.PI / 6, dir + Math.PI / 6);
+    }
+
+    /* AI 제안 */
     const aiGhosts: NodeMeta[] = [];
     try {
-      const res = await apiCreateAINodes(projectId, parent.label||"", parent.x, parent.y, 0, 0);
-      // (res as any[]).slice(0, aiCnt).forEach((srv, i) => {
-      const response = Array.isArray(res) ? res.slice(0, aiCnt) : [];
+      const res = await apiCreateAINodes(
+        projectId,
+        parent.label,
+        parent.x,
+        parent.y
+      );
+      const arr = Array.isArray(res) ? res.slice(0, aiCnt) : [];
       for (let i = 0; i < aiCnt; i++) {
-        const srv = response[i];  // 없으면 undefined
+        const srv = arr[i];
         const { x, y } = polarToXY(parent.x, parent.y, radius, angles[i]);
         aiGhosts.push({
-          id:    srv?.id    ?? uuidv4(),
-          label: srv?.content ?? `AI 제안 ${i+1}`,
-          x, y,
+          id: srv?.id ?? uuidv4(),
+          label: srv?.content ?? `AI 제안 ${i + 1}`,
+          x,
+          y,
           parentId: parent.id,
           opacity: 0.3,
           status: "GHOST",
           frozen: false,
         });
-      // });
       }
-    } catch(e){ console.error(e); }
+    } catch (e) {
+      console.error(e);
+    }
 
-    /* 2) 빈 노드 */
-    const blanks: NodeMeta[] = Array.from({length: blankCnt}, (_,i)=>{
-      const idx = aiCnt+i; const {x,y}=polarToXY(parent.x,parent.y,radius,angles[idx]);
-      return {
+    /* 빈 노드 */
+    const blanks: NodeMeta[] = [];
+    const blankCnt = childCnt - aiGhosts.length;
+    for (let i = 0; i < blankCnt; i++) {
+      const idx = aiGhosts.length + i;
+      const { x, y } = polarToXY(parent.x, parent.y, radius, angles[idx]);
+      blanks.push({
         id: uuidv4(),
         label: "?",
-        x, y,
+        x,
+        y,
         parentId: parent.id,
         opacity: 0.3,
         status: "GHOST",
         frozen: false,
-      };
-    });
+      });
+    }
 
     const children = [...aiGhosts, ...blanks];
-    setNodes(p => { const next=[...p, ...children]; nodesRef.current=next; return next; });
+    setNodes((p) => {
+      const next = [...p, ...children];
+      nodesRef.current = next;
+      return next;
+    });
     addToCy(children);
-
     parent.frozen = true;
     parent.generated = true;
   };
 
-  /* ─── 클릭 핸들러 ─── */
+  /* ----- 노드 활성화 ----- */
+  const activateNode = (n: NodeMeta) => {
+    n.opacity = 1;
+    n.status = "ACTIVE";
+    n.frozen = true;
+    cyInstance.current?.$id(n.id).style("opacity", 1);
+  };
+
+  /* ----- 클릭 & 우클릭 핸들러 ----- */
   const handleTap = async (e: cytoscape.EventObject) => {
     const id = e.target.id();
-    const cur = nodesRef.current.find(n=>n.id===id);
+    const cur = nodesRef.current.find((n) => n.id === id);
     if (!cur) return;
 
-    if (cur.status==="GHOST") {                // 제안 확정
-      await activateNode(cur);
+    if (cur.status === "GHOST") {
+      activateNode(cur);
       return;
     }
-    if (cur.generated) return;                // 이미 확장됨
-    // ── (NEW) 노드 라벨 편집 ──
-    const newLabel = window.prompt("이 노드의 문장을 입력하세요", cur.label);
-    if (!newLabel) return;                    // 취소면 종료
+
+    if (cur.generated) return;
+
+    const newLabel = window.prompt("노드 내용을 입력하세요", cur.label);
+    if (!newLabel) return;
     cur.label = newLabel;
     cyInstance.current?.$id(id).data("label", newLabel);
 
-    await spawnChildren(cur);                 // 자식 3개 만들기
+    await spawnChildren(cur);
   };
 
-  /* ─── Cytoscape init ─── */
-  useEffect(()=>{ if(!cyRef.current) return;
+  /* ----- cytoscape init ----- */
+  useEffect(() => {
+    if (!cyRef.current) return;
     const cy = cytoscape({
       container: cyRef.current,
       elements: [],
-      layout: { name:"preset" },
-      style:[
-        { selector:"node", style:{
-            "background-color":"#0074D9",
-            "label":"data(label)",
-            "color":"#fff",
-            "text-valign":"center",
-            "text-halign":"center",
-            "font-size":12,
-            "opacity":"data(opacity)" as any,
-        }},
-        { selector:"edge", style:{
-            width:2, "line-color":"#ccc",
-            "target-arrow-color":"#ccc","target-arrow-shape":"triangle",
-            "curve-style":"bezier",
-        }},
+      layout: { name: "preset" },
+      style: [
+        {
+          selector: "node",
+          style: {
+            "background-color": "#0074D9",
+            label: "data(label)",
+            color: "#fff",
+            "text-valign": "center",
+            "text-halign": "center",
+            "font-size": 12,
+            opacity: "data(opacity)" as any,
+          },
+        },
+        {
+          selector: "edge",
+          style: {
+            width: 2,
+            "line-color": "#ccc",
+            "target-arrow-color": "#ccc",
+            "target-arrow-shape": "triangle",
+            "curve-style": "bezier",
+          },
+        },
       ],
     });
+
     cyInstance.current = cy;
     addToCy(nodesRef.current);
-    cy.on("tap","node",handleTap);
 
-    // spawnChildren(nodesRef.current[0]).catch(console.error);
+    cy.on("tap", "node", handleTap);
 
-    return ()=>{cy.destroy();};
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[]);
+    /* 우클릭 메뉴 */
+    cy.on("cxttap", "node", (ev) => {
+      const nodeId = ev.target.id();
+      setCtxNodeId(nodeId);
+      showMenu({
+        event: ev.originalEvent,   // 마우스 이벤트
+        props: { nodeId }          // 커스텀 데이터
+      });
+    });
 
-  return <div ref={cyRef} style={{width:"100%",height:"600px"}}/>;
+    return () => {
+      cy.destroy();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /* ----- 렌더 ----- */
+  return (
+    <>
+      <div ref={cyRef} style={{ width: "100%", height: "600px" }} />
+      <NodeContextMenu
+        nodeId={ctxNodeId}
+        tags={tags}
+        nodeTags={
+          ctxNodeId
+            ? nodesRef.current.find((n) => n.id === ctxNodeId)?.tags ?? []
+            : []
+        }
+        onAdd={handleAddTag}
+        onRemove={handleRemoveTag}
+      />
+    </>
+  );
 }
