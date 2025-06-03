@@ -1,14 +1,16 @@
 # app/db/models/vote.py
-from sqlalchemy import Column, String, DateTime, ForeignKey
+from sqlalchemy import Column, BigInteger, DateTime, ForeignKey, UniqueConstraint
 from datetime import datetime
-import uuid
-from .project import Base
+from app.db.models.base import Base
 
 class Vote(Base):
-    __tablename__ = "votes"
+    __tablename__ = "vote"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    project_id = Column(String, ForeignKey("projects.id"))
-    tag_id = Column(String, ForeignKey("tags.id"))
-    user_id = Column(String, ForeignKey("users.id"))
-    voted_at = Column(DateTime, default=datetime.utcnow)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    tag_summary_id = Column(BigInteger, ForeignKey("tag_summary.id", ondelete="CASCADE"), nullable=False)
+    voter_id = Column(BigInteger, ForeignKey("app_user.id"), nullable=True)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint("tag_summary_id", "voter_id"),
+    )

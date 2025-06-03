@@ -1,28 +1,50 @@
 # backend/app/routers/history.py
+
 from typing import List
-from fastapi import APIRouter, Depends, Path, HTTPException
-from app.models import HistoryOut
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
+
+from app.models.vote import HistoryOut   # Pydantic 스키마
 from app.core.security import get_current_user_id as _uid
 from app.utils.helpers import ensure_member as _m
-from app.db import store as db
-from app.core.security import get_current_user_id as _uid
-from app.utils.helpers   import ensure_member as _m, ensure_owner as _o, \
-                               get_node as _n, get_tag as _t
-from app.utils.time      import utc_now as _now
-from app.db              import store as db
+from app.db.models.history import ProjectHistory
+from app.db.session import AsyncSessionLocal
 
 router = APIRouter(prefix="/projects/{project_id}/history", tags=["History"])
 
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session
+
 @router.get("", response_model=List[HistoryOut])
-def list_history(project_id: str, uid: str = Depends(_uid)):
+async def list_history(
+    project_id: int,
+    uid: str = Depends(_uid),
+    db: AsyncSession = Depends(get_db)
+):
     _m(uid, project_id)
-    return [h for h in db.PROJECT_HISTORY if h["project_id"] == project_id]
+    result = await db.execute(
+        select(ProjectHistory).where(ProjectHistory.project_id == project_id)
+    )
+    entries = result.scalars().all()
+    return entries
 
 @router.get("/{entry_id}", response_model=HistoryOut)
-def get_history(project_id: str, entry_id: str, uid: str = Depends(_uid)):
+async def get_history(
+    project_id: int,
+    entry_id: int,
+    uid: str = Depends(_uid),
+    db: AsyncSession = Depends(get_db)
+):
     _m(uid, project_id)
-    entry=next((h for h in db.PROJECT_HISTORY
-               if h["id"]==entry_id and h["project_id"]==project_id), None)
+    result = await db.execute(
+        select(ProjectHistory).where(
+            ProjectHistory.id == entry_id,
+            ProjectHistory.project_id == project_id
+        )
+    )
+    entry = result.scalar_one_or_none()
     if not entry:
-        raise HTTPException(404,"History entry not found")
+        raise HTTPException(404, "History entry not found")
     return entry

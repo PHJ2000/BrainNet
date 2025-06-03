@@ -1,17 +1,14 @@
 # app/db/models/tag.py
-from sqlalchemy import Column, String, Text, ForeignKey
+from sqlalchemy import Column, BigInteger, String, ForeignKey
 from sqlalchemy.orm import relationship
-import uuid
-from .project import Base
+from app.db.models.base import Base
 
 class Tag(Base):
-    __tablename__ = "tags"
+    __tablename__ = "tag"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    project_id = Column(String, ForeignKey("projects.id"))
-    name = Column(String, nullable=False)
-    description = Column(Text)
-    color = Column(String)
-    summary = Column(Text)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    project_id = Column(BigInteger, ForeignKey("project.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(80), nullable=False)
+    color = Column(String(7), nullable=True)
 
-    project = relationship("Project", backref="tags")
+    project = relationship("Project", backref="tags", foreign_keys=[project_id])

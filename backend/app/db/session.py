@@ -1,7 +1,7 @@
 # backend/app/db/session.py
 import os
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from sqlalchemy.orm import declarative_base
+from app.db.models.base import Base
 from dotenv import load_dotenv
 
 # .env 불러오기
@@ -20,4 +20,3 @@ engine = create_async_engine(
 )
 
 AsyncSessionLocal = async_sessionmaker(engine, expire_on_commit=False)
-Base = declarative_base()

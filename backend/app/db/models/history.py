@@ -1,15 +1,11 @@
 # app/db/models/history.py
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, BigInteger, DateTime, ForeignKey
 from datetime import datetime
-import uuid
-from .project import Base
+from app.db.models.base import Base
+class ProjectHistory(Base):
+    __tablename__ = "project_history"
 
-class History(Base):
-    __tablename__ = "history"
-
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    project_id = Column(String, ForeignKey("projects.id"))
-    tag_id = Column(String, ForeignKey("tags.id"))
-    summary = Column(Text)
-    decided_at = Column(DateTime, default=datetime.utcnow)
-    decided_by = Column(String, ForeignKey("users.id"))
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    project_id = Column(BigInteger, ForeignKey("project.id", ondelete="CASCADE"), nullable=False)
+    tag_summary_id = Column(BigInteger, ForeignKey("tag_summary.id"), nullable=True)
+    decided_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
