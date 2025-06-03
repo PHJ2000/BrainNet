@@ -1,18 +1,22 @@
 # backend/app/models/vote.py
 from pydantic import BaseModel
 from typing import Optional
+from datetime import datetime
 
 class VoteOut(BaseModel):
-    id: str
-    project_id: str
-    tag_id: str
-    user_id: str
-    voted_at: str
+    id: int
+    tag_summary_id: int
+    voter_id: Optional[int]
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
 
 class HistoryOut(BaseModel):
-    id: str
-    project_id: str
-    tag_id: str
-    summary: str
-    decided_at: str
-    decided_by: str
+    id: int
+    project_id: int
+    tag_summary_id: Optional[int]
+    decided_at: datetime
+
+    class Config:
+        orm_mode = True
