@@ -9,7 +9,7 @@ from app.db import store as db
 from app.core.security import get_current_user_id as _uid
 from app.utils.helpers   import ensure_member as _m, ensure_owner as _o, \
                                get_node as _n, get_tag as _t
-from app.routers.tags import attach_tag, detach_tag
+from app.routers.tags import _attach_tag, _detach_tag
 from app.utils.time      import utc_now as _now
 from app.db              import store as db
 import re, openai, os
@@ -86,7 +86,7 @@ def create_node(body: NodeCreate, project_id: str, uid: str = Depends(_uid)):
         pass
     else:
         for tag_id in db.NODE_TAG_MAP[body.parent_id]:
-            attach_tag(project_id,tag_id, nid, uid)
+            _attach_tag(project_id,tag_id, nid)
     
     return node
 
@@ -107,7 +107,7 @@ def delete_node(project_id: str, node_id: str, uid: str = Depends(_uid)):
     db.NODES.pop(node_id, None)
     tags = db.NODE_TAG_MAP[node_id]
     for tag in tags:
-        detach_tag(project_id,tag, node_id, uid)
+        _detach_tag(project_id,tag, node_id)
     return
 
 @router.post("/{node_id}/activate", response_model=NodeOut)

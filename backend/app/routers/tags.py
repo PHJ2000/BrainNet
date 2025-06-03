@@ -21,6 +21,7 @@ def list_tags(project_id: str, uid: str = Depends(_uid)):
     _m(uid, project_id)
     return [t for t in db.TAGS.values() if t["project_id"] == project_id]
 
+#노드id를 받아 태그 생성후 바로 attach시킨다. 자식 노드들까지 전부 attach시킨다.
 @router.post("", response_model=TagOut, status_code=201)
 def create_tag(body: TagCreate, project_id: str, uid: str = Depends(_uid)):
     _m(uid, project_id)
@@ -29,6 +30,9 @@ def create_tag(body: TagCreate, project_id: str, uid: str = Depends(_uid)):
         "id":tid,"project_id":project_id,"name":body.name,"description":body.description,
         "color":body.color,"node_count":0,"summary":""
     }
+    
+    _attach_nodechain_to_tag(project_id, tid, body,uid)
+
     return db.TAGS[tid]
 
 @router.get("/{tag_id}", response_model=TagOut)
@@ -60,7 +64,7 @@ def delete_tag(project_id: str, tag_id: str, uid: str = Depends(_uid)):
         if tag_id in tags:
             tags.remove(tag_id)
     return
-
+#해당 함수는 태그를 노드에 붙이는 함수인데 태그->노드 필수 이므로 굳이 존재해야하나???
 @router.post("/{tag_id}/nodes/{node_id}", response_model=Dict[str, str])
 def attach_tag(project_id: str, tag_id: str, node_id: str,
                uid: str = Depends(_uid)):
@@ -73,15 +77,12 @@ def attach_tag(project_id: str, tag_id: str, node_id: str,
     tag["node_count"]+=1
     return {"tag_id":tag_id,"node_id":node_id,"status":"attached"}
 
+#노드에서 태그를 제거 -> 해당 노드의 자식노드들 까지 전부 해당 태그를 제거해 준다.
 @router.delete("/{tag_id}/nodes/{node_id}", response_model=Dict[str, str])
 def detach_tag(project_id: str, tag_id: str, node_id: str,
                uid: str = Depends(_uid)):
     _m(uid, project_id)
-    node=_n(node_id, project_id)
-    if tag_id not in db.NODE_TAG_MAP[node_id]:
-        raise HTTPException(400,"Node not tagged")
-    db.NODE_TAG_MAP[node_id].remove(tag_id)
-    db.TAGS[tag_id]["node_count"]-=1
+    _detach_nodechain_to_tag(project_id,tag_id,node_id,uid)
     return {"tag_id":tag_id,"node_id":node_id,"status":"detached"}
 
 @router.post("/{tag_id}/summary", response_model=TagOut)
@@ -95,7 +96,6 @@ def refresh_summary(project_id: str, tag_id: str,
     tag["summary"]=_create_summary("\n".join(n["content"] for n in nodes[:3])) or "(empty)"
 
     return tag
-
 
 def _create_summary(contents: str):
     try:
@@ -125,12 +125,8 @@ def _attach_nodechain_to_tag(project_id: str, tag_id: str, node_id: str,
     if node_id in visited:
         return  # 순환 방지
     visited.add(node_id)
-    node=_n(node_id, project_id)
-    tag=_t(tag_id)
-    if tag_id in db.NODE_TAG_MAP[node_id]:
-        raise HTTPException(409,"Already attached")
-    db.NODE_TAG_MAP[node_id].append(tag_id)
-    tag["node_count"]+=1
+    
+    _attach_tag(project_id,tag_id,node_id)
 
     chlidnodes = get_node_by_parent_id(node_id)
     if not chlidnodes :
@@ -146,16 +142,29 @@ def _detach_nodechain_to_tag(project_id: str, tag_id: str, node_id: str,
     if node_id in visited:
         return  # 순환 방지
     visited.add(node_id)
-    node=_n(node_id, project_id)
-    tag=_t(tag_id)
-    if tag_id not in db.NODE_TAG_MAP[node_id]:
-        raise HTTPException(400,"Node not tagged")
-    db.NODE_TAG_MAP[node_id].remove(tag_id)
-    db.TAGS[tag_id]["node_count"]-=1
-
+    _detach_tag(project_id,tag_id,node_id)
     chlidnodes = get_node_by_parent_id(node_id)
     if not chlidnodes :
         return
     for child in chlidnodes:
         _detach_nodechain_to_tag(project_id, tag_id, child, uid, visited) 
 
+#노드에서 단독으로 하나의 태그만 부착하는 내부함수
+def _attach_tag(project_id: str, tag_id: str, node_id: str):
+    node=_n(node_id, project_id)
+    tag=_t(tag_id)
+    if tag_id in db.NODE_TAG_MAP[node_id]:
+        raise HTTPException(409,"Already attached")
+    db.NODE_TAG_MAP[node_id].append(tag_id)
+    tag["node_count"]+=1
+    return {"tag_id":tag_id,"node_id":node_id,"status":"attached"}
+
+#노드에서 단독으로 하나의 태그만 부착하는 내부함수
+def _detach_tag(project_id: str, tag_id: str, node_id: str):
+    node=_n(node_id, project_id)
+    tag=_t(tag_id)
+    if tag_id not in db.NODE_TAG_MAP[node_id]:
+        raise HTTPException(400,"Node not tagged")
+    db.NODE_TAG_MAP[node_id].remove(tag_id)
+    db.TAGS[tag_id]["node_count"]-=1
+    return {"tag_id":tag_id,"node_id":node_id,"status":"detached"}

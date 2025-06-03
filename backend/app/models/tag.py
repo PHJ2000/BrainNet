@@ -6,6 +6,7 @@ class TagCreate(BaseModel):
     name: str
     description: Optional[str] = None
     color: Optional[str] = None
+    node_id : str
 
 class TagUpdate(BaseModel):
     name: Optional[str] = None
