@@ -1,18 +1,18 @@
 # app/db/models/project.py
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey
+from sqlalchemy import Column, BigInteger, String, Text, DateTime, ForeignKey, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
-import uuid
-from .user import Base
 from app.db.models.base import Base
+
 class Project(Base):
-    __tablename__ = "projects"
+    __tablename__ = "project"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    name = Column(String, nullable=False)
-    description = Column(Text)
-    owner_id = Column(String, ForeignKey("users.id"))
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    owner_id = Column(BigInteger, ForeignKey("app_user.id", ondelete="CASCADE"), nullable=False)
+    name = Column(String(120), nullable=False)
+    description = Column(Text, nullable=True)
+    is_deleted = Column(Boolean, nullable=False, default=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    owner = relationship("User", backref="projects")
+    owner = relationship("User", backref="projects", foreign_keys=[owner_id])

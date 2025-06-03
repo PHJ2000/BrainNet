@@ -1,16 +1,14 @@
 # app/db/models/user.py
-from sqlalchemy import Column, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-import uuid
+from sqlalchemy import Column, BigInteger, String, DateTime
 from datetime import datetime
 from app.db.models.base import Base
-Base = declarative_base()
 
 class User(Base):
-    __tablename__ = "users"
+    __tablename__ = "app_user"
 
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    email = Column(String, unique=True, nullable=False, index=True)
-    hashed_password = Column(String, nullable=False)
-    name = Column(String, nullable=True)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    id = Column(BigInteger, primary_key=True, autoincrement=True)
+    name = Column(String(80), nullable=True)
+    email = Column(String(120), unique=True, nullable=False)
+    pw_hash = Column(String(255), nullable=False)
+    created_at = Column(DateTime(timezone=True), nullable=False, default=datetime.utcnow)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
