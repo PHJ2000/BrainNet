@@ -10,7 +10,7 @@ class VoteOut(BaseModel):
     created_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True
 
 class HistoryOut(BaseModel):
     id: int
@@ -19,4 +19,4 @@ class HistoryOut(BaseModel):
     decided_at: datetime
 
     class Config:
-        orm_mode = True
+        from_attributes = True

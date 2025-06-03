@@ -1,3 +1,4 @@
+# app/db/models/tag_summary.py
 from sqlalchemy import Column, BigInteger, Text, DateTime, ForeignKey
 from datetime import datetime
 from app.db.models.base import Base

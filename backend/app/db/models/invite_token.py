@@ -1,3 +1,4 @@
+# app/db/models/invite_token.py
 from sqlalchemy import Column, String, BigInteger, DateTime, Enum, ForeignKey, UniqueConstraint
 from datetime import datetime
 from app.db.models.base import Base

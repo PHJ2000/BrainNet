@@ -1,37 +1,37 @@
 # backend/app/models/node.py
 from pydantic import BaseModel
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime
 
 class NodeCreate(BaseModel):
     content: Optional[str] = None
-    parent_id: Optional[int] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
     depth: Optional[int] = 0
-    order_index: Optional[int] = 0
-    pos_x: Optional[float] = None
-    pos_y: Optional[float] = None
+    order: Optional[int] = 0
     ai_prompt: Optional[str] = None
+    parent_id: Optional[int] = None
 
 class NodeUpdate(BaseModel):
     content: Optional[str] = None
+    x: Optional[float] = None
+    y: Optional[float] = None
     depth: Optional[int] = None
-    order_index: Optional[int] = None
-    pos_x: Optional[float] = None
-    pos_y: Optional[float] = None
+    order: Optional[int] = None
 
 class NodeOut(BaseModel):
     id: int
     project_id: int
-    parent_id: Optional[int]
     author_id: Optional[int]
     content: str
     state: str
-    depth: int
-    order_index: int
     pos_x: Optional[float]
     pos_y: Optional[float]
-    created_at: datetime
-    updated_at: datetime
+    depth: int
+    order_index: int
+    parent_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True

@@ -1,3 +1,4 @@
+# app/db/models/node_version.py
 from sqlalchemy import Column, BigInteger, Integer, Text, DateTime, ForeignKey, UniqueConstraint
 from datetime import datetime
 from app.db.models.base import Base

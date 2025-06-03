@@ -11,7 +11,8 @@ from .node_metrics import *
 from .node_version import *
 from .invite_token import *
 from .activity_log import *
-
+from .user import UserRead, UserCreate, UserSimple
+from .history import ProjectHistoryOut
 __all__ = (
     "UserCreate", "Token", "UserRead",
     "ProjectCreate", "ProjectUpdate", "ProjectOut",

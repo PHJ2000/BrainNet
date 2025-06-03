@@ -1,31 +1,35 @@
 # backend/app/routers/websocket.py
+
 from fastapi import APIRouter, WebSocket, Query
 from jose import jwt, JWTError
 from app.core.security import SECRET_KEY, ALGORITHM
 from app.utils.ws_manager import connect, disconnect
-from app.db import store as db   # (사실 직접 쓰진 않지만 추후 확장 대비)
-from app.core.security import get_current_user_id as _uid
-from app.utils.helpers   import ensure_member as _m, ensure_owner as _o, \
-                               get_node as _n, get_tag as _t
-from app.utils.time      import utc_now as _now
-from app.db              import store as db
 
 router = APIRouter()
 
 @router.websocket("/projects/{project_id}/ws")
-async def project_ws(project_id: str, websocket: WebSocket,
-                     token: str = Query(...)):
+async def project_ws(
+    project_id: str,
+    websocket: WebSocket,
+    token: str = Query(...)
+):
+    # 1) 토큰 검증
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         if not payload.get("sub"):
             raise JWTError()
     except JWTError:
+        # 유효하지 않은 토큰이면 연결 차단
         await websocket.close(code=4401)
         return
 
+    # 2) WS 매니저에 연결 등록
     await connect(project_id, websocket)
+
     try:
         while True:
-            await websocket.receive_text()   # 필요하면 메시지 소비
+            # 필요에 따라 클라이언트가 보내는 메시지도 처리할 수 있음
+            await websocket.receive_text()
     finally:
+        # 연결이 끊어질 때 반드시 호출하여 clean-up
         disconnect(project_id, websocket)

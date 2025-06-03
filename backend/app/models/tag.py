@@ -18,4 +18,4 @@ class TagOut(BaseModel):
     node_count: Optional[int] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True

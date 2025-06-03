@@ -24,4 +24,4 @@ class ProjectOut(BaseModel):
     tag_count: Optional[int] = None
 
     class Config:
-        orm_mode = True
+        from_attributes = True

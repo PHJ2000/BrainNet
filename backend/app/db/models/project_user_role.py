@@ -1,3 +1,4 @@
+# app/db/models/project_user_role.py
 from sqlalchemy import Column, BigInteger, Enum, DateTime, ForeignKey, PrimaryKeyConstraint
 from datetime import datetime
 from app.db.models.base import Base

@@ -1,26 +1,34 @@
-import uuid, random
-from typing import List, Dict, Any, Optional
+# backend/app/routers/nodes.py
+import uuid, re, openai, os
+from typing import List, Optional
+
 from fastapi import APIRouter, Depends, Query, Path, HTTPException, status
-from app.models import NodeCreate, NodeUpdate, NodeOut
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select, insert, update, delete
+from sqlalchemy.orm import joinedload
+
+from app.models.node import NodeCreate, NodeUpdate, NodeOut
 from app.core.security import get_current_user_id as _uid
-from app.utils.helpers import ensure_member as _m, get_node as _n
-from app.utils.time import utc_now as _now
-from app.db import store as db
-from app.core.security import get_current_user_id as _uid
-from app.utils.helpers   import ensure_member as _m, ensure_owner as _o, \
-                               get_node as _n, get_tag as _t
-from app.routers.tags import attach_tag, detach_tag
-from app.utils.time      import utc_now as _now
-from app.db              import store as db
-import re, openai, os
+from app.utils.helpers import ensure_member as _m, ensure_owner as _o, get_tag as _t
+from app.db.models.node import Node as NodeORM, NodeStateEnum
+from app.db.models.tag_node import TagNode
+from app.db.models.tag import Tag as TagORM
+from app.db.session import AsyncSessionLocal
 
 router = APIRouter(prefix="/projects/{project_id}/nodes", tags=["Nodes"])
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
+
+# ── DB 세션 의존성 ───────────────────────────────────────────────────
+async def get_db():
+    async with AsyncSessionLocal() as session:
+        yield session
+
 # ── 내부 유틸: AI Ghost Stub ────────────────────────────────────────────
-def _gen_ai_nodes(project_id: str, prompt: str):
-    nodes=[]
-    print(os.getenv("OPENAI_API_KEY"))
+async def _gen_ai_nodes(project_id: int, prompt: str, db: AsyncSession):
+    # GPT 호출 그대로 두고, DB에 GHOST 노드 2개 저장
+    nodes_created = []
+
     try:
         response = openai.chat.completions.create(
             model="gpt-3.5-turbo",
@@ -31,97 +39,218 @@ def _gen_ai_nodes(project_id: str, prompt: str):
             max_tokens=256,
             temperature=0.7,
         )
-        answer = response.choices[0].message.content.strip()# 메시지 파싱
-        
-        ideas = [s for s in re.split(r'\n+', answer) if s]
-
-        
-        ideas = ideas[:2]
-        cleaned_ideas = [re.sub(r'^\d+\.\s*', '', n) for n in ideas] # 숫자 기호 제거.
-
+        answer = response.choices[0].message.content.strip()
+        ideas = [s for s in re.split(r'\n+', answer) if s][:2]
+        cleaned = [re.sub(r'^\d+\.\s*', '', s) for s in ideas]
     except Exception as e:
-        import traceback
-        print(traceback.format_exc())  # 전체 예외 스택을 콘솔에 출력
         raise HTTPException(status_code=500, detail=str(e))
-    for i in range(2):
-        nid=f"node_{uuid.uuid4().hex[:6]}"
-        node={
-            "id":nid,"project_id":project_id,"content":f"{cleaned_ideas[i]}",
-            "status":"GHOST","x":random.uniform(200,400),"y":random.uniform(200,400),
-            "depth":0,"order":i,"authors":[]
-        }
-        db.NODES[nid]=node
-        db.NODE_TAG_MAP[nid]=[]
-        nodes.append(node)
-    return nodes
+
+    # GHOST 노드 2개 생성
+    for idx, content in enumerate(cleaned):
+        new_node = NodeORM(
+            project_id=project_id,
+            parent_id=None,
+            author_id=None,               # 작성자 미정
+            content=content,
+            state=NodeStateEnum.GHOST,
+            depth=0,
+            order_index=idx,
+            pos_x=None,
+            pos_y=None,
+        )
+        db.add(new_node)
+        await db.flush()  # id 등 세팅
+        nodes_created.append(new_node)
+
+    await db.commit()
+    # ORMs → Pydantic으로 변환할 때 `from_orm` 사용
+    return [NodeOut.from_orm(n) for n in nodes_created]
 
 # ── CRUD ───────────────────────────────────────────────────────────────
-@router.get("", response_model=List[Dict[str, Any]])
-def list_nodes(project_id: str, tag_ids: Optional[str] = Query(None),
-               uid: str = Depends(_uid)):
+@router.get("", response_model=List[NodeOut])
+async def list_nodes(
+    project_id: int,
+    tag_ids: Optional[str] = Query(None),
+    uid: str = Depends(_uid),
+    db: AsyncSession = Depends(get_db)
+):
+    # 사용자 권한 확인
     _m(uid, project_id)
-    nodes = [n for n in db.NODES.values() if n["project_id"] == project_id]
-    if tag_ids:
-        wanted=set(tag_ids.split(','))
-        nodes=[n for n in nodes if wanted & set(db.NODE_TAG_MAP.get(n["id"],[]))]
-    return nodes
 
-@router.post("", response_model=Any, status_code=201)
-def create_node(body: NodeCreate, project_id: str, uid: str = Depends(_uid)):
+    # 기본 쿼리: 해당 프로젝트 내 모든 노드
+    query = select(NodeORM).where(NodeORM.project_id == project_id)
+
+    # 태그 필터링: tag_ids="1,2,3" 형태
+    if tag_ids:
+        wanted = [int(tid) for tid in tag_ids.split(",")]
+        query = (
+            query.join(TagNode, NodeORM.id == TagNode.node_id)
+                 .where(TagNode.tag_id.in_(wanted))
+        )
+
+    result = await db.execute(query)
+    nodes = result.scalars().all()
+    return [NodeOut.from_orm(n) for n in nodes]
+
+@router.post("", response_model=NodeOut, status_code=status.HTTP_201_CREATED)
+async def create_node(
+    body: NodeCreate,
+    project_id: int,
+    uid: str = Depends(_uid),
+    db: AsyncSession = Depends(get_db)
+):
     _m(uid, project_id)
+
+    # AI 모드: ai_prompt가 있으면 Ghost 노드 생성
     if body.ai_prompt:
-        return _gen_ai_nodes(project_id, body.ai_prompt)
-    if body.content is None:
-        raise HTTPException(400, "content is required when ai_prompt absent")
-    nid=f"node_{uuid.uuid4().hex[:6]}"
-    node={
-        "id":nid,"project_id":project_id,"content":body.content,"status":"ACTIVE",
-        "x":body.x or 0.0,"y":body.y or 0.0,"depth":body.depth or 0,"order":body.order or 0,
-        "authors":[uid], "parent_id": body.parent_id or None
-    }
-    db.NODES[nid]=node
-    #만약 부모노드가 태그를 가지고 있다면, 자식 노드도 동일한 태그가 있어야한다.
-    db.NODE_TAG_MAP[nid] = []
-    if body.parent_id is None:
-        pass
-    else:
-        for tag_id in db.NODE_TAG_MAP[body.parent_id]:
-            attach_tag(project_id,tag_id, nid, uid)
-    
-    return node
+        return (await _gen_ai_nodes(project_id, body.ai_prompt, db))
+
+    # content 필수
+    if not body.content:
+        raise HTTPException(status_code=400, detail="content is required when ai_prompt absent")
+
+    # 새 NodeORM 인스턴스 생성
+    new_node = NodeORM(
+        project_id=project_id,
+        parent_id=body.parent_id,
+        author_id=int(uid),            # 현재 사용자 ID
+        content=body.content,
+        state=NodeStateEnum.ACTIVE,
+        depth=body.depth or 0,
+        order_index=body.order or 0,
+        pos_x=body.x or 0.0,
+        pos_y=body.y or 0.0,
+    )
+    db.add(new_node)
+    await db.commit()
+    await db.refresh(new_node)
+
+    # 부모 노드가 태그를 가지고 있다면, 자식 노드에 동일 태그 연결 (예시)
+    if body.parent_id is not None:
+        # 부모 태그 목록 조회
+        parent_tags = await db.execute(
+            select(TagNode.tag_id).where(TagNode.node_id == body.parent_id)
+        )
+        for (tag_id,) in parent_tags.all():
+            tagnode = TagNode(tag_id=tag_id, node_id=new_node.id)
+            db.add(tagnode)
+        await db.commit()
+
+    return NodeOut.from_orm(new_node)
 
 @router.patch("/{node_id}", response_model=NodeOut)
-def update_node(body: NodeUpdate, project_id: str, node_id: str,
-                uid: str = Depends(_uid)):
+async def update_node(
+    body: NodeUpdate,
+    project_id: int = Path(...),
+    node_id: int = Path(...),
+    uid: str = Depends(_uid),
+    db: AsyncSession = Depends(get_db)
+):
     _m(uid, project_id)
-    node=_n(node_id, project_id)
-    for f in ("content","x","y","depth","order"):
-        val=getattr(body,f)
-        if val is not None:
-            node[f]=val
-    return node
 
-@router.delete("/{node_id}", status_code=204)
-def delete_node(project_id: str, node_id: str, uid: str = Depends(_uid)):
+    # 노드가 해당 프로젝트에 속하는지 확인
+    result = await db.execute(
+        select(NodeORM).where(NodeORM.id == node_id, NodeORM.project_id == project_id)
+    )
+    node = result.scalar_one_or_none()
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    # 각 필드 업데이트
+    updated = False
+    if body.content is not None:
+        node.content = body.content
+        updated = True
+    if body.x is not None:
+        node.pos_x = body.x
+        updated = True
+    if body.y is not None:
+        node.pos_y = body.y
+        updated = True
+    if body.depth is not None:
+        node.depth = body.depth
+        updated = True
+    if body.order is not None:
+        node.order_index = body.order
+        updated = True
+
+    if updated:
+        await db.commit()
+        await db.refresh(node)
+
+    return NodeOut.from_orm(node)
+
+@router.delete("/{node_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_node(
+    project_id: int = Path(...),
+    node_id: int = Path(...),
+    uid: str = Depends(_uid),
+    db: AsyncSession = Depends(get_db)
+):
     _m(uid, project_id)
-    db.NODES.pop(node_id, None)
-    tags = db.NODE_TAG_MAP[node_id]
-    for tag in tags:
-        detach_tag(project_id,tag, node_id, uid)
+
+    # 삭제할 노드 조회
+    result = await db.execute(
+        select(NodeORM).where(NodeORM.id == node_id, NodeORM.project_id == project_id)
+    )
+    node = result.scalar_one_or_none()
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    # 태그 연결부터 삭제 (Cascade로 연결된 TagNode 레코드도 지워주려면, TagNode 모델에 ondelete="CASCADE"여야 합니다)
+    await db.execute(
+        delete(TagNode).where(TagNode.node_id == node_id)
+    )
+
+    # 실제 노드 삭제
+    await db.execute(
+        delete(NodeORM).where(NodeORM.id == node_id)
+    )
+    await db.commit()
     return
 
 @router.post("/{node_id}/activate", response_model=NodeOut)
-def activate_node(project_id: str, node_id: str, uid: str = Depends(_uid)):
-    node=_n(node_id, project_id)
-    if node["status"]!="GHOST":
-        raise HTTPException(400,"Node is not in GHOST state")
-    node["status"]="ACTIVE"
-    return node
+async def activate_node(
+    project_id: int = Path(...),
+    node_id: int = Path(...),
+    uid: str = Depends(_uid),
+    db: AsyncSession = Depends(get_db)
+):
+    _m(uid, project_id)
+
+    result = await db.execute(
+        select(NodeORM).where(NodeORM.id == node_id, NodeORM.project_id == project_id)
+    )
+    node = result.scalar_one_or_none()
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    if node.state != NodeStateEnum.GHOST:
+        raise HTTPException(status_code=400, detail="Node is not in GHOST state")
+    node.state = NodeStateEnum.ACTIVE
+    await db.commit()
+    await db.refresh(node)
+    return NodeOut.from_orm(node)
 
 @router.post("/{node_id}/deactivate", response_model=NodeOut)
-def deactivate_node(project_id: str, node_id: str, uid: str = Depends(_uid)):
-    node=_n(node_id, project_id)
-    if node["status"]!="ACTIVE":
-        raise HTTPException(400,"Node is not in GHOST state")
-    node["status"]="GHOST"
-    return node
+async def deactivate_node(
+    project_id: int = Path(...),
+    node_id: int = Path(...),
+    uid: str = Depends(_uid),
+    db: AsyncSession = Depends(get_db)
+):
+    _m(uid, project_id)
+
+    result = await db.execute(
+        select(NodeORM).where(NodeORM.id == node_id, NodeORM.project_id == project_id)
+    )
+    node = result.scalar_one_or_none()
+    if not node:
+        raise HTTPException(status_code=404, detail="Node not found")
+
+    if node.state != NodeStateEnum.ACTIVE:
+        raise HTTPException(status_code=400, detail="Node is not in ACTIVE state")
+    node.state = NodeStateEnum.GHOST
+    await db.commit()
+    await db.refresh(node)
+    return NodeOut.from_orm(node)

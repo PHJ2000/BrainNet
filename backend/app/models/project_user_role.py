@@ -11,4 +11,4 @@ class ProjectUserRoleOut(BaseModel):
     accepted_at: Optional[datetime]
 
     class Config:
-        orm_mode = True
+        from_attributes = True

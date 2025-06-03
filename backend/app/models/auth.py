@@ -1,18 +1,24 @@
-# backend/app/models/vote.py
-from pydantic import BaseModel
+# #backend/app/models/auth.py
+from pydantic import BaseModel, EmailStr
 from typing import Optional
+from datetime import datetime
 
-class VoteOut(BaseModel):
-    id: str
-    project_id: str
-    tag_id: str
-    user_id: str
-    voted_at: str
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+    name: Optional[str] = None
 
-class HistoryOut(BaseModel):
-    id: str
-    project_id: str
-    tag_id: str
-    summary: str
-    decided_at: str
-    decided_by: str
+class Token(BaseModel):
+    access_token: str
+    token_type: str = "Bearer"
+
+
+class UserRead(BaseModel):
+    id: int
+    email: EmailStr
+    name: Optional[str]
+    created_at: datetime
+    last_login_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

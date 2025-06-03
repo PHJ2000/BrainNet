@@ -1,3 +1,4 @@
+# app/db/models/tag_node.py
 from sqlalchemy import Column, BigInteger, ForeignKey, PrimaryKeyConstraint
 from app.db.models.base import Base
 
