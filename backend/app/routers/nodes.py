@@ -241,12 +241,14 @@ async def activate_node(
     node.state = NodeStateEnum.ACTIVE
 
     # 1. 모든 자식 노드 조회
-    descendants = await get_descendant_node_ids(node_id,db)
+    node_ids = await get_descendant_node_ids(node_id,db)
 
     # 2. 자식 노드도 ACTIVE로 변경 (GHOST 상태만)
-    for child in descendants:
-        if child.state == NodeStateEnum.GHOST:
-            child.state = NodeStateEnum.ACTIVE
+    await db.execute(
+        update(NodeORM)
+        .where(NodeORM.id.in_(node_ids), NodeORM.state == NodeStateEnum.ACTIVE)
+        .values(state=NodeStateEnum.GHOST)
+    )
 
     await db.commit()
     await db.refresh(node)
