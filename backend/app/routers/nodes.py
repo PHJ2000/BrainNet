@@ -28,9 +28,9 @@ async def get_db():
 
 
 # ── 내부 유틸: AI Ghost Stub ────────────────────────────────────────────
-async def _gen_ai_nodes(project_id: int, prompt: str, db: AsyncSession) -> NodeOut:
+async def _gen_ai_nodes(project_id: int,body: NodeCreate, prompt: str, db: AsyncSession, uid: str = Depends(_uid)) -> List[NodeOut]:
     """
-    GPT로 유령 노드 두 개를 생성하되, 응답으로는 첫 번째 노드만 반환합니다.
+    GPT로 유령 노드 두 개를 생성하고, 두 노드 모두 반환합니다.
     """
     nodes_created: List[NodeORM] = []
 
@@ -54,24 +54,26 @@ async def _gen_ai_nodes(project_id: int, prompt: str, db: AsyncSession) -> NodeO
     for idx, content in enumerate(cleaned):
         new_node = NodeORM(
             project_id=project_id,
-            parent_id=None,
-            author_id=None,               # 작성자 미정
+            parent_id=body.parent_id if body.parent_id not in (None, 0, "", "0") else None,
+            author_id=int(uid),
             content=content,
-            state=NodeStateEnum.GHOST,
-            depth=0,
+            state=NodeStateEnum.ACTIVE,
+            depth=body.depth or 0,
             order_index=idx,
-            pos_x=None,
-            pos_y=None,
+            pos_x=body.x or 0.0,
+            pos_y=body.y or 0.0,
         )
         db.add(new_node)
-        await db.flush()  # id 등 세팅
+        await db.flush()
         nodes_created.append(new_node)
 
     await db.commit()
-    await db.refresh(nodes_created[0])  # 첫 번째 노드만 리프레시해줍니다
+    # 두 노드 모두 refresh
+    for node in nodes_created:
+        await db.refresh(node)
 
-    # 첫 번째 Ghost 노드만 반환
-    return NodeOut.from_orm(nodes_created[0])
+    # 두 노드를 모두 NodeOut 형태로 변환하여 반환
+    return [NodeOut.from_orm(n) for n in nodes_created]
 
 
 # ── CRUD ───────────────────────────────────────────────────────────────
@@ -98,8 +100,8 @@ async def list_nodes(
     return [NodeOut.from_orm(n) for n in nodes]
 
 
-@router.post("", response_model=NodeOut, status_code=status.HTTP_201_CREATED)
-async def create_node(
+@router.post("", response_model=List[NodeOut], status_code=status.HTTP_201_CREATED)
+async def create_nodes(
     body: NodeCreate,
     project_id: int,
     uid: str = Depends(_uid),
@@ -107,17 +109,17 @@ async def create_node(
 ):
     await _m(int(uid), project_id, db)
 
-    # AI 모드: ai_prompt가 있으면 첫 번째 Ghost 노드만 반환
+    # AI 모드: ai_prompt가 있으면 첫 번째 Ghost 노드만 반환 (여러 개 생성은 별도 구현 필요)
     if body.ai_prompt:
-        return await _gen_ai_nodes(project_id, body.ai_prompt, db)
+        return await _gen_ai_nodes(project_id,body, body.ai_prompt, db,uid)
 
-    # content 필수
+    # content 필수 (여러 개 생성 가능하도록 리스트로 받는 게 더 좋음, 여기선 2번 반복)
     if not body.content:
         raise HTTPException(status_code=400, detail="content is required when ai_prompt absent")
 
     new_node = NodeORM(
         project_id=project_id,
-        parent_id=body.parent_id,
+        parent_id=body.parent_id if body.parent_id not in (None, 0, "", "0") else None,
         author_id=int(uid),
         content=body.content,
         state=NodeStateEnum.ACTIVE,
@@ -140,7 +142,7 @@ async def create_node(
             db.add(tagnode)
         await db.commit()
 
-    return NodeOut.from_orm(new_node)
+    return [NodeOut.from_orm(new_node)]
 
 
 @router.patch("/{node_id}", response_model=NodeOut)
