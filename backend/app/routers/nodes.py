@@ -233,6 +233,15 @@ async def activate_node(
     if node.state != NodeStateEnum.GHOST:
         raise HTTPException(status_code=400, detail="Node is not in GHOST state")
     node.state = NodeStateEnum.ACTIVE
+
+    # 1. 모든 자식 노드 조회
+    descendants = await get_descendant_node_ids(node_id,db)
+
+    # 2. 자식 노드도 ACTIVE로 변경 (GHOST 상태만)
+    for child in descendants:
+        if child.state == NodeStateEnum.GHOST:
+            child.state = NodeStateEnum.ACTIVE
+
     await db.commit()
     await db.refresh(node)
     return NodeOut.from_orm(node)
