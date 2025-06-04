@@ -55,13 +55,13 @@ async def _gen_ai_nodes(project_id: int,body: NodeCreate, prompt: str, db: Async
         new_node = NodeORM(
             project_id=project_id,
             parent_id=body.parent_id if body.parent_id not in (None, 0, "", "0") else None,
-            author_id=int(uid),
+            authors=int(uid),
             content=content,
-            state=NodeStateEnum.GHOST,
+            status=NodeStateEnum.GHOST,
             depth=body.depth or 0,
-            order_index=idx,
-            pos_x=body.x or 0.0,
-            pos_y=body.y or 0.0,
+            order=idx,
+            x=body.x or 0.0,
+            y=body.y or 0.0,
         )
         db.add(new_node)
         await db.flush()
@@ -120,13 +120,13 @@ async def create_nodes(
     new_node = NodeORM(
         project_id=project_id,
         parent_id=body.parent_id if body.parent_id not in (None, 0, "", "0") else None,
-        author_id=int(uid),
+        authors=int(uid),
         content=body.content,
-        state=NodeStateEnum.ACTIVE,
+        status=NodeStateEnum.ACTIVE,
         depth=body.depth or 0,
-        order_index=body.order or 0,
-        pos_x=body.x or 0.0,
-        pos_y=body.y or 0.0,
+        order=body.order or 0,
+        x=body.x or 0.0,
+        y=body.y or 0.0,
     )
     db.add(new_node)
     await db.commit()

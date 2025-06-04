@@ -22,13 +22,13 @@ class NodeUpdate(BaseModel):
 class NodeOut(BaseModel):
     id: int
     project_id: int
-    author_id: Optional[int]
+    authors: Optional[int]
     content: str
-    state: str
-    pos_x: Optional[float]
-    pos_y: Optional[float]
+    status: str
+    x: Optional[float]
+    y: Optional[float]
     depth: int
-    order_index: int
+    order: int
     parent_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None

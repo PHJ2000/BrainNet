@@ -40,7 +40,7 @@ async def register(body: UserCreate, db: AsyncSession = Depends(get_db)):
     new_user = User(
         email=body.email,
         name=body.name,
-        pw_hash=pw_hash,
+        hashed_password=pw_hash,
         created_at=datetime.utcnow()
     )
     db.add(new_user)
@@ -53,7 +53,7 @@ async def register(body: UserCreate, db: AsyncSession = Depends(get_db)):
 async def login(form: OAuth2PasswordRequestForm = Depends(), db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(User).where(User.email == form.username))
     user = result.scalar_one_or_none()
-    if not user or not verify_password(form.password, user.pw_hash):
+    if not user or not verify_password(form.password, user.hashed_password):
         raise HTTPException(401, "Invalid credentials")
     token = create_access_token(sub=str(user.id))
     return {"access_token": token, "token_type": "Bearer"}
