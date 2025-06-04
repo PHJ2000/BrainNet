@@ -277,8 +277,12 @@ async def deactivate_node(
 
     # (3) ACTIVE 상태인 노드만 GHOST로 일괄 비활성화
     # bulk select
-    nodes_result = await db.execute(
-        select(NodeORM).where(NodeORM.id.in_(node_ids))
+    await db.execute(
+        update(NodeORM)
+        .where(NodeORM.id.in_(node_ids), NodeORM.state == NodeStateEnum.ACTIVE)
+        .values(state=NodeStateEnum.GHOST)
     )
-    nodes = nodes_result.scalars().all()
-    update
+
+    await db.commit()
+    await db.refresh(node)
+    return NodeOut.from_orm(node)
