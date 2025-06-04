@@ -15,6 +15,7 @@ from app.db.models.tag_node import TagNode as TagNodeORM
 from app.db.models.node import Node as NodeORM
 from app.db.session import AsyncSessionLocal
 
+
 router = APIRouter(prefix="/projects/{project_id}/tags", tags=["Tags"])
 
 
@@ -262,6 +263,8 @@ async def attach_tag(
     node = node_row.scalar_one_or_none()
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
+        
+    
 
     # (3) 이미 연결된 적 있는지 검사
     exist = await db.execute(
@@ -272,11 +275,29 @@ async def attach_tag(
     )
     if exist.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Already attached")
+    
+    # (4) 모든 자손 노드 id 수집
+    node_ids = await get_descendant_node_ids(node_id,db)
 
-    # (4) 신규 TagNode 행 삽입
-    tn = TagNodeORM(tag_id=tag_id, node_id=node_id)
-    db.add(tn)
+    # (5) 이미 연결된 관계는 제외하고 bulk insert
+    # 이미 연결된 (tag_id, node_id) 목록 조회
+    exist_rows = await db.execute(
+        select(TagNodeORM.node_id)
+        .where(
+            TagNodeORM.tag_id == tag_id,
+            TagNodeORM.node_id.in_(node_ids)
+        )
+    )
+    already_attached = set(row[0] for row in exist_rows.all())
+
+    # 신규 연결 대상만 추림
+    # 연결
+    to_attach = [nid for nid in node_ids if nid not in already_attached]
+    db.add_all([TagNodeORM(tag_id=tag_id, node_id=nid) for nid in to_attach])
     await db.commit()
+
+    
+ 
     return {"tag_id": tag_id, "node_id": node_id, "status": "attached"}
 
 
@@ -326,12 +347,32 @@ async def detach_tag(
     if not exist.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Node not tagged")
 
-    # (4) 연결 해제
+    # (4) 모든 자손 노드 id 수집 (자기 자신 포함)
+    node_ids = await get_descendant_node_ids(node_id,db)  # ← 앞서 정의한 함수 재사용
+
+    # (5) 실제로 연결되어 있던 TagNodeORM 삭제 (bulk)
     await db.execute(
         delete(TagNodeORM).where(
             TagNodeORM.tag_id == tag_id,
-            TagNodeORM.node_id == node_id
+            TagNodeORM.node_id.in_(node_ids)
         )
     )
     await db.commit()
     return {"tag_id": tag_id, "node_id": node_id, "status": "detached"}
+
+# 자식노드 리스트를 전부 반환하는 메소드
+async def get_descendant_node_ids(node_id: int,db: AsyncSession = Depends(get_db)) -> list[int]:
+    """
+    node_id를 루트로 하는 모든 자손 노드들의 id를 리스트로 반환 (자기 자신 포함)
+    """
+    result = [node_id]
+    queue = [node_id]
+    while queue:
+        current_id = queue.pop()
+        rows = await db.execute(
+            select(NodeORM.id).where(NodeORM.parent_id == current_id)
+        )
+        children = [row[0] for row in rows.all()]
+        result.extend(children)
+        queue.extend(children)
+    return result

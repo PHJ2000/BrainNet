@@ -84,10 +84,3 @@ async def get_tag(tag_id: int, project_id: int, db: AsyncSession):
     return tag
 
 
-async def get_node_by_parent_id(parent_id: int, db: AsyncSession):
-    """
-    parent_id 기준으로 자식 Node들의 ID 리스트를 반환합니다.
-    """
-    stmt = select(Node.id).where(Node.parent_id == parent_id)
-    result = await db.execute(stmt)
-    return [row[0] for row in result.all()]
