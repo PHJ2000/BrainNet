@@ -47,7 +47,7 @@ async def my_tag_summaries(
     """
     # 1) 이 사용자가 속한 프로젝트 ID 목록
     projects_result = await db.execute(
-        select(ProjectUserRole.project_id).where(ProjectUserRole.user_id == uid)
+        select(ProjectUserRole.project_id).where(ProjectUserRole.user_id == int(uid))
     )
     project_ids = [pid for (pid,) in projects_result.all()]
 

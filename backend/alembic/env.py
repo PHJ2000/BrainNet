@@ -10,7 +10,6 @@ from alembic import context
 
 # [2] DB 세션과 모델 불러오기
 from app.db.session import DATABASE_URL
-from app.db.models import Base
 
 # Alembic 설정
 config = context.config

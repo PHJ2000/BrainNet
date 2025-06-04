@@ -19,6 +19,19 @@ from app.db.models.node import Node as NodeORM
 from app.db.models.tag import Tag as TagORM
 from app.db.session import AsyncSessionLocal
 
+from fastapi import APIRouter, Depends, Path, HTTPException, status
+from sqlalchemy import select, func
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Dict, Any, Optional
+
+from app.models.project import ProjectOut
+from app.core.security import get_current_user_id as _uid
+from app.utils.helpers import ensure_owner as _o
+from app.db.models.project import Project as ProjectORM
+from app.db.models.node import Node as NodeORM
+from app.db.models.tag import Tag as TagORM
+from app.db.models.tag_node import TagNode
+from app.db.session import AsyncSessionLocal
 router = APIRouter(prefix="/projects", tags=["Projects"])
 
 
@@ -103,7 +116,7 @@ async def get_project(
     - 멤버 권한 확인 (ensure_member)
     - node_count, tag_count는 동적 집계해서 반환 필드에 포함
     """
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
     # (1) 프로젝트 자체 조회
     result = await db.execute(
@@ -145,7 +158,7 @@ async def update_project(
     - ensure_owner으로 권한 확인
     - name/description 중 일부만 업데이트 가능
     """
-    proj = await _o(uid, project_id, db)  # ensure_owner는 ORM 기반으로 수정했다고 가정
+    proj = await _o(int(uid), project_id, db)  # ensure_owner는 ORM 기반으로 수정했다고 가정
     if body.name is not None:
         proj.name = body.name
     if body.description is not None:
@@ -167,7 +180,7 @@ async def delete_project(
     - 실제로는 is_deleted=True 처리 (소프트 딜리트).  
       필요 시, 실제 레코드를 삭제하려면 delete(ProjectORM)... 호출
     """
-    proj = await _o(uid, project_id, db)
+    proj = await _o(int(uid), project_id, db)
 
     # 소프트 딜리트
     proj.is_deleted = True
@@ -190,7 +203,7 @@ async def invite_project(
     - InviteToken 테이블이 있으면, 해당 테이블에 레코드 저장
       (편의상 로직 생략, 필요 시 InviteToken ORM으로 바꾸세요)
     """
-    await _o(uid, project_id, db)
+    await _o(int(uid), project_id, db)
 
     # 예시: 단순 토큰 생성 (실제로는 InviteToken ORM에 저장)
     token = uuid.uuid4().hex
@@ -242,42 +255,47 @@ async def project_summary(
     uid: str = Depends(_uid),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    프로젝트 요약 조회:  
-    - 멤버 검증  
-    - 태그별 node_count 집계 후 정렬해서 반환  
-    """
-    _m(uid, project_id)
+    await _o(int(uid), project_id, db)
 
-    # (1) 태그별 node_count 집계
+    # 1) 태그별 node_count 집계
     tag_counts = await db.execute(
         select(
             TagORM.id.label("tag_id"),
             TagORM.name.label("tag_name"),
-            func.count(NodeORM.id).label("node_count")
+            func.count(NodeORM.id).label("node_count"),
         )
-        .join(NodeORM, NodeORM.id == TagNode.node_id, isouter=True)
+        .outerjoin(TagNode, TagORM.id == TagNode.tag_id)
+        .outerjoin(NodeORM, NodeORM.id == TagNode.node_id)
         .where(TagORM.project_id == project_id)
         .group_by(TagORM.id)
         .order_by(func.count(NodeORM.id).desc())
     )
     rows = tag_counts.all()
 
-    # (2) 결과 조합
+    # 2) 결과 조합
     tag_summaries = [
         {
             "tag_id": row.tag_id,
             "tag_name": row.tag_name,
-            "node_count": row.node_count
+            "node_count": row.node_count,
         }
         for row in rows
     ]
 
-    # (3) 최종 반환
+    # 3) 최종 반환
+    # project_name, total_nodes, total_tags 등도 각각 집계
+    proj_obj = await db.get(ProjectORM, project_id)
+    total_nodes = (await db.execute(
+        select(func.count(NodeORM.id)).where(NodeORM.project_id == project_id)
+    )).scalar_one()
+    total_tags = (await db.execute(
+        select(func.count(TagORM.id)).where(TagORM.project_id == project_id)
+    )).scalar_one()
+
     return {
         "project_id": project_id,
-        "project_name": (await db.get(ProjectORM, project_id)).name,
-        "total_nodes": (await db.execute(select(func.count(NodeORM.id)).where(NodeORM.project_id == project_id))).scalar_one(),
-        "total_tags": (await db.execute(select(func.count(TagORM.id)).where(TagORM.project_id == project_id))).scalar_one(),
+        "project_name": proj_obj.name,
+        "total_nodes": total_nodes,
+        "total_tags": total_tags,
         "tag_summaries": tag_summaries,
     }

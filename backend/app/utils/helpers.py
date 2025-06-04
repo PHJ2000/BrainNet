@@ -1,32 +1,93 @@
-from fastapi import HTTPException
-from app.db import store as db
+# app/utils/helpers.py
 
-def ensure_member(uid: str, project_id: str):
-    if uid not in db.PROJECT_MEMBER_MAP.get(project_id, []):
-        raise HTTPException(403, "Not a project member")
+from fastapi import HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
-def ensure_owner(uid: str, project_id: str):
-    proj = db.PROJECTS.get(project_id)
-    if proj is None:
-        raise HTTPException(404, "Project not found")
-    if proj["owner_id"] != uid:
-        raise HTTPException(403, "Owner permission required")
+from app.db.models.project_user_role import ProjectUserRole
+from app.db.models.project import Project
+from app.db.models.node import Node
+from app.db.models.tag import Tag
+
+
+async def ensure_member(uid: int, project_id: int, db: AsyncSession):
+    """
+    프로젝트 멤버 검증: ProjectUserRole에 uid, project_id 레코드가 있는지 확인합니다.
+    """
+    stmt = select(ProjectUserRole).where(
+        ProjectUserRole.project_id == project_id,
+        ProjectUserRole.user_id == uid
+    )
+    result = await db.execute(stmt)
+    membership = result.scalar_one_or_none()
+    if not membership:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not a project member"
+        )
+    return membership
+
+
+async def ensure_owner(uid: int, project_id: int, db: AsyncSession):
+    """
+    프로젝트 소유자(Owner) 검증:  
+    1) 프로젝트가 존재하는지, 삭제되지 않았는지 검사  
+    2) ProjectUserRole에 OWNER 권한 레코드가 있는지 검사  
+    """
+    # 1) 프로젝트 존재 여부 확인 (soft-delete: is_deleted=False)
+    proj = await db.get(Project, project_id)
+    if proj is None or proj.is_deleted:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Project not found"
+        )
+
+    # 2) 해당 uid가 OWNER인지 검사
+    stmt = select(ProjectUserRole).where(
+        ProjectUserRole.project_id == project_id,
+        ProjectUserRole.user_id == uid,
+        ProjectUserRole.role == "OWNER"
+    )
+    result = await db.execute(stmt)
+    owner_record = result.scalar_one_or_none()
+    if not owner_record:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Owner permission required"
+        )
     return proj
 
-def get_node(node_id: str, project_id: str):
-    node = db.NODES.get(node_id)
-    if not node or node["project_id"] != project_id:
-        raise HTTPException(404, "Node not found")
+
+async def get_node(node_id: int, project_id: int, db: AsyncSession):
+    """
+    Node 조회 + project_id 일치 여부 확인.
+    """
+    node = await db.get(Node, node_id)
+    if not node or node.project_id != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Node not found"
+        )
     return node
 
-def get_tag(tag_id: str):
-    tag = db.TAGS.get(tag_id)
-    if not tag:
-        raise HTTPException(404, "Tag not found")
+
+async def get_tag(tag_id: int, project_id: int, db: AsyncSession):
+    """
+    Tag 조회 + project_id 일치 여부 확인.
+    """
+    tag = await db.get(Tag, tag_id)
+    if not tag or tag.project_id != project_id:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tag not found"
+        )
     return tag
 
-def get_node_by_parent_id(parent_id: str):
-    nodes =  [node_id for node_id, node in db.NODES.items() if node.get("parent_id") == parent_id]
-    if not nodes: 
-        return None
-    return nodes
+
+async def get_node_by_parent_id(parent_id: int, db: AsyncSession):
+    """
+    parent_id 기준으로 자식 Node들의 ID 리스트를 반환합니다.
+    """
+    stmt = select(Node.id).where(Node.parent_id == parent_id)
+    result = await db.execute(stmt)
+    return [row[0] for row in result.all()]

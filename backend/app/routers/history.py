@@ -23,7 +23,7 @@ async def list_history(
     uid: str = Depends(_uid),
     db: AsyncSession = Depends(get_db)
 ):
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
     result = await db.execute(
         select(ProjectHistory).where(ProjectHistory.project_id == project_id)
     )
@@ -37,7 +37,7 @@ async def get_history(
     uid: str = Depends(_uid),
     db: AsyncSession = Depends(get_db)
 ):
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
     result = await db.execute(
         select(ProjectHistory).where(
             ProjectHistory.id == entry_id,
