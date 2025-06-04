@@ -1,15 +1,15 @@
 # backend/app/routers/nodes.py
+
 import uuid, re, openai, os
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query, Path, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, update, delete
-from sqlalchemy.orm import joinedload
 
 from app.models.node import NodeCreate, NodeUpdate, NodeOut
 from app.core.security import get_current_user_id as _uid
-from app.utils.helpers import ensure_member as _m, ensure_owner as _o, get_tag as _t
+from app.utils.helpers import ensure_member as _m, ensure_owner as _o
 from app.db.models.node import Node as NodeORM, NodeStateEnum
 from app.db.models.tag_node import TagNode
 from app.db.models.tag import Tag as TagORM
@@ -19,15 +19,19 @@ router = APIRouter(prefix="/projects/{project_id}/nodes", tags=["Nodes"])
 
 openai.api_key = os.getenv("OPENAI_API_KEY")
 
+
 # ── DB 세션 의존성 ───────────────────────────────────────────────────
 async def get_db():
     async with AsyncSessionLocal() as session:
         yield session
 
+
 # ── 내부 유틸: AI Ghost Stub ────────────────────────────────────────────
-async def _gen_ai_nodes(project_id: int, prompt: str, db: AsyncSession):
-    # GPT 호출 그대로 두고, DB에 GHOST 노드 2개 저장
-    nodes_created = []
+async def _gen_ai_nodes(project_id: int, prompt: str, db: AsyncSession) -> NodeOut:
+    """
+    GPT로 유령 노드 두 개를 생성하되, 응답으로는 첫 번째 노드만 반환합니다.
+    """
+    nodes_created: List[NodeORM] = []
 
     try:
         response = openai.chat.completions.create(
@@ -44,7 +48,7 @@ async def _gen_ai_nodes(project_id: int, prompt: str, db: AsyncSession):
         cleaned = [re.sub(r'^\d+\.\s*', '', s) for s in ideas]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
-
+    
     # GHOST 노드 2개 생성
     for idx, content in enumerate(cleaned):
         new_node = NodeORM(
@@ -63,8 +67,11 @@ async def _gen_ai_nodes(project_id: int, prompt: str, db: AsyncSession):
         nodes_created.append(new_node)
 
     await db.commit()
-    # ORMs → Pydantic으로 변환할 때 `from_orm` 사용
-    return [NodeOut.from_orm(n) for n in nodes_created]
+    await db.refresh(nodes_created[0])  # 첫 번째 노드만 리프레시해줍니다
+
+    # 첫 번째 Ghost 노드만 반환
+    return NodeOut.from_orm(nodes_created[0])
+
 
 # ── CRUD ───────────────────────────────────────────────────────────────
 @router.get("", response_model=List[NodeOut])
@@ -74,13 +81,10 @@ async def list_nodes(
     uid: str = Depends(_uid),
     db: AsyncSession = Depends(get_db)
 ):
-    # 사용자 권한 확인
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
-    # 기본 쿼리: 해당 프로젝트 내 모든 노드
     query = select(NodeORM).where(NodeORM.project_id == project_id)
 
-    # 태그 필터링: tag_ids="1,2,3" 형태
     if tag_ids:
         wanted = [int(tid) for tid in tag_ids.split(",")]
         query = (
@@ -92,6 +96,7 @@ async def list_nodes(
     nodes = result.scalars().all()
     return [NodeOut.from_orm(n) for n in nodes]
 
+
 @router.post("", response_model=NodeOut, status_code=status.HTTP_201_CREATED)
 async def create_node(
     body: NodeCreate,
@@ -99,21 +104,20 @@ async def create_node(
     uid: str = Depends(_uid),
     db: AsyncSession = Depends(get_db)
 ):
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
-    # AI 모드: ai_prompt가 있으면 Ghost 노드 생성
+    # AI 모드: ai_prompt가 있으면 첫 번째 Ghost 노드만 반환
     if body.ai_prompt:
-        return (await _gen_ai_nodes(project_id, body.ai_prompt, db))
+        return await _gen_ai_nodes(project_id, body.ai_prompt, db)
 
     # content 필수
     if not body.content:
         raise HTTPException(status_code=400, detail="content is required when ai_prompt absent")
 
-    # 새 NodeORM 인스턴스 생성
     new_node = NodeORM(
         project_id=project_id,
         parent_id=body.parent_id,
-        author_id=int(uid),            # 현재 사용자 ID
+        author_id=int(uid),
         content=body.content,
         state=NodeStateEnum.ACTIVE,
         depth=body.depth or 0,
@@ -127,7 +131,6 @@ async def create_node(
 
     # 부모 노드가 태그를 가지고 있다면, 자식 노드에 동일 태그 연결 (예시)
     if body.parent_id is not None:
-        # 부모 태그 목록 조회
         parent_tags = await db.execute(
             select(TagNode.tag_id).where(TagNode.node_id == body.parent_id)
         )
@@ -138,6 +141,7 @@ async def create_node(
 
     return NodeOut.from_orm(new_node)
 
+
 @router.patch("/{node_id}", response_model=NodeOut)
 async def update_node(
     body: NodeUpdate,
@@ -146,9 +150,8 @@ async def update_node(
     uid: str = Depends(_uid),
     db: AsyncSession = Depends(get_db)
 ):
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
-    # 노드가 해당 프로젝트에 속하는지 확인
     result = await db.execute(
         select(NodeORM).where(NodeORM.id == node_id, NodeORM.project_id == project_id)
     )
@@ -156,7 +159,6 @@ async def update_node(
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
 
-    # 각 필드 업데이트
     updated = False
     if body.content is not None:
         node.content = body.content
@@ -180,6 +182,7 @@ async def update_node(
 
     return NodeOut.from_orm(node)
 
+
 @router.delete("/{node_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_node(
     project_id: int = Path(...),
@@ -187,9 +190,8 @@ async def delete_node(
     uid: str = Depends(_uid),
     db: AsyncSession = Depends(get_db)
 ):
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
-    # 삭제할 노드 조회
     result = await db.execute(
         select(NodeORM).where(NodeORM.id == node_id, NodeORM.project_id == project_id)
     )
@@ -197,17 +199,15 @@ async def delete_node(
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
 
-    # 태그 연결부터 삭제 (Cascade로 연결된 TagNode 레코드도 지워주려면, TagNode 모델에 ondelete="CASCADE"여야 합니다)
     await db.execute(
         delete(TagNode).where(TagNode.node_id == node_id)
     )
-
-    # 실제 노드 삭제
     await db.execute(
         delete(NodeORM).where(NodeORM.id == node_id)
     )
     await db.commit()
     return
+
 
 @router.post("/{node_id}/activate", response_model=NodeOut)
 async def activate_node(
@@ -216,7 +216,7 @@ async def activate_node(
     uid: str = Depends(_uid),
     db: AsyncSession = Depends(get_db)
 ):
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
     result = await db.execute(
         select(NodeORM).where(NodeORM.id == node_id, NodeORM.project_id == project_id)
@@ -232,6 +232,7 @@ async def activate_node(
     await db.refresh(node)
     return NodeOut.from_orm(node)
 
+
 @router.post("/{node_id}/deactivate", response_model=NodeOut)
 async def deactivate_node(
     project_id: int = Path(...),
@@ -239,7 +240,7 @@ async def deactivate_node(
     uid: str = Depends(_uid),
     db: AsyncSession = Depends(get_db)
 ):
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
     result = await db.execute(
         select(NodeORM).where(NodeORM.id == node_id, NodeORM.project_id == project_id)

@@ -35,7 +35,7 @@ async def list_tags(
     프로젝트(project_id)에 속한 모든 태그를 조회합니다.
     각 TagOut에 node_count(해당 태그에 연결된 노드 개수)도 포함됩니다.
     """
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
     # (1) 해당 프로젝트의 태그들 조회
     result = await db.execute(
@@ -87,7 +87,7 @@ async def create_tag(
     - ensure_member 검사: 프로젝트에 속한 사용자여야 함
     - name, color 필드로 TagORM 인스턴스 삽입
     """
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
     new_tag = TagORM(
         project_id=project_id,
@@ -122,7 +122,7 @@ async def get_tag(
     - 프로젝트와 일치하는지 확인 (ensure_member)
     - node_count, 연결된 node ID 목록(nodes)을 포함
     """
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
     # (1) 태그가 존재하는지, 그리고 project_id가 일치하는지 확인
     result = await db.execute(
@@ -164,7 +164,7 @@ async def update_tag(
     태그 이름(name) 혹은 색상(color)을 수정합니다.
     - ensure_member 검사
     """
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
     # (1) ORM에서 태그 조회
     result = await db.execute(
@@ -212,7 +212,7 @@ async def delete_tag(
     - ensure_member 검사
     - TagNode 테이블에서 해당 tag_id로 연결된 모든 행도 함께 삭제됩니다 (CASCADE)
     """
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
     # (1) ORM에서 태그 조회 & 삭제
     result = await db.execute(
@@ -245,7 +245,7 @@ async def attach_tag(
     - ensure_member 검사
     - 이미 연결되어 있으면 409 에러
     """
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
     # (1) Tag가 project_id에 속하는지 확인
     tag_row = await db.execute(
@@ -298,7 +298,7 @@ async def detach_tag(
     - ensure_member 검사
     - 연결된 적 없으면 400 에러
     """
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
     # (1) Tag 존재 여부 검사
     tag_row = await db.execute(

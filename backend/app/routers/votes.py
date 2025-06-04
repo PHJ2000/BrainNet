@@ -37,7 +37,7 @@ async def cast_vote(
     db: AsyncSession = Depends(get_db),
 ):
     # 1) 프로젝트 멤버 여부 확인
-    _m(uid, project_id)
+    await _m(int(uid), project_id, db)
 
     # 2) tag_id → TagSummary 테이블 내에서 해당 태그 요약(record) 조회
     #    (TagSummary.tag_id 컬럼이 실제 태그 테이블의 PK를 FK로 참조하므로)
@@ -91,7 +91,7 @@ async def confirm_votes(
     db: AsyncSession = Depends(get_db),
 ):
     # 1) 프로젝트 소유자(또는 관리자)여야 함
-    _o(uid, project_id)
+    await _o(int(uid), project_id, db)
 
     # 2) 해당 프로젝트의 투표(미확정) 목록 조회 → TagSummary ID 기준으로 집계
     vote_stmt = select(Vote).where(
