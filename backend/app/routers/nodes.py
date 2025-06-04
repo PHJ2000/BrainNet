@@ -246,8 +246,8 @@ async def activate_node(
     # 2. 자식 노드도 ACTIVE로 변경 (GHOST 상태만)
     await db.execute(
         update(NodeORM)
-        .where(NodeORM.id.in_(node_ids), NodeORM.state == NodeStateEnum.ACTIVE)
-        .values(state=NodeStateEnum.GHOST)
+        .where(NodeORM.id.in_(node_ids), NodeORM.state == NodeStateEnum.GHOST)
+        .values(state=NodeStateEnum.ACTIVE)
     )
 
     await db.commit()
