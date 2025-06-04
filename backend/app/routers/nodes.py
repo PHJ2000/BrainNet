@@ -57,7 +57,7 @@ async def _gen_ai_nodes(project_id: int,body: NodeCreate, prompt: str, db: Async
             parent_id=body.parent_id if body.parent_id not in (None, 0, "", "0") else None,
             author_id=int(uid),
             content=content,
-            state=NodeStateEnum.ACTIVE,
+            state=NodeStateEnum.GHOST,
             depth=body.depth or 0,
             order_index=idx,
             pos_x=body.x or 0.0,
