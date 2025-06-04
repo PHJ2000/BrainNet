@@ -14,6 +14,7 @@ from app.db.models.node import Node as NodeORM, NodeStateEnum
 from app.db.models.tag_node import TagNode
 from app.db.models.tag import Tag as TagORM
 from app.db.session import AsyncSessionLocal
+from app.routers.tags import get_descendant_node_ids
 
 router = APIRouter(prefix="/projects/{project_id}/nodes", tags=["Nodes"])
 
@@ -189,7 +190,7 @@ async def delete_node(
 ):
     _m(uid, project_id)
 
-    # 삭제할 노드 조회
+    # (1) 삭제할 노드 존재 여부 확인
     result = await db.execute(
         select(NodeORM).where(NodeORM.id == node_id, NodeORM.project_id == project_id)
     )
@@ -197,15 +198,19 @@ async def delete_node(
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
 
-    # 태그 연결부터 삭제 (Cascade로 연결된 TagNode 레코드도 지워주려면, TagNode 모델에 ondelete="CASCADE"여야 합니다)
+    # (2) 모든 자식 노드 id 리스트 수집 (자기 자신 포함)
+    node_ids = await get_descendant_node_ids( node_id,db)
+
+    # (3) 해당 노드들에 연결된 태그 관계 모두 삭제
     await db.execute(
-        delete(TagNode).where(TagNode.node_id == node_id)
+        delete(TagNode).where(TagNode.node_id.in_(node_ids))
     )
 
-    # 실제 노드 삭제
+    # (4) 실제 노드들 삭제
     await db.execute(
-        delete(NodeORM).where(NodeORM.id == node_id)
+        delete(NodeORM).where(NodeORM.id.in_(node_ids))
     )
+
     await db.commit()
     return
 
@@ -241,6 +246,7 @@ async def deactivate_node(
 ):
     _m(uid, project_id)
 
+    # (1) 노드 존재 확인
     result = await db.execute(
         select(NodeORM).where(NodeORM.id == node_id, NodeORM.project_id == project_id)
     )
@@ -248,9 +254,13 @@ async def deactivate_node(
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
 
-    if node.state != NodeStateEnum.ACTIVE:
-        raise HTTPException(status_code=400, detail="Node is not in ACTIVE state")
-    node.state = NodeStateEnum.GHOST
-    await db.commit()
-    await db.refresh(node)
-    return NodeOut.from_orm(node)
+    # (2) 전체 자식 노드 id 수집 (자기자신 포함)
+    node_ids = await get_descendant_node_ids( node_id,db)
+
+    # (3) ACTIVE 상태인 노드만 GHOST로 일괄 비활성화
+    # bulk select
+    nodes_result = await db.execute(
+        select(NodeORM).where(NodeORM.id.in_(node_ids))
+    )
+    nodes = nodes_result.scalars().all()
+    update

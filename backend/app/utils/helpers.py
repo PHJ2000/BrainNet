@@ -25,8 +25,4 @@ def get_tag(tag_id: str):
         raise HTTPException(404, "Tag not found")
     return tag
 
-def get_node_by_parent_id(parent_id: str):
-    nodes =  [node_id for node_id, node in db.NODES.items() if node.get("parent_id") == parent_id]
-    if not nodes: 
-        return None
-    return nodes
+
