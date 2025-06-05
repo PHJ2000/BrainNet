@@ -10,3 +10,240 @@ Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
 Date:   Thu Jun 5 21:22:57 2025 +0900
 
     feat: new_project2
+
+[33mcommit eb01c229f798a58a31412057d8b6e1455d4b9bf1[m
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Thu Jun 5 21:22:41 2025 +0900
+
+    feat: new_project
+
+[33mcommit edfc85a098925d3123a17eea08deb6102383214e[m
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Thu Jun 5 19:04:55 2025 +0900
+
+    1
+
+[33mcommit cedea64144b6aeb0434d13516b73548a1dd20d79[m[33m ([m[1;31morigin/old_81[m[33m, [m[1;32mold_81[m[33m)[m
+Merge: 4f93337 31bd10c
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Thu Jun 5 00:49:12 2025 +0900
+
+    Merge branch 'front_dev' into old_8
+
+[33mcommit 4f9333781d1c57cf32abc2b1a622a48417c781de[m[33m ([m[1;31morigin/recover_id[m[33m)[m
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Thu Jun 5 00:48:09 2025 +0900
+
+    1
+
+[33mcommit 710d97ce485fe651b4a2f7fb21b94e44085b86c4[m
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Thu Jun 5 00:33:51 2025 +0900
+
+    1
+
+[33mcommit b3b0edbd123aea4f67f91d0bded1ab8409fe80e6[m
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Thu Jun 5 00:26:46 2025 +0900
+
+    d
+
+[33mcommit f017c1c3f4dc4a6e7e9eb0ee4583fa42151e3825[m
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Wed Jun 4 22:51:52 2025 +0900
+
+    ghostnode
+
+[33mcommit 3bbf9f81b9bea6cc9bae70cdb8fb62bb0f131691[m
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Wed Jun 4 22:36:54 2025 +0900
+
+    nodeCreation
+
+[33mcommit 7825547651c286dd7835c0b94ac881c7b6197e12[m
+Merge: 5d68857 60aee91
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Wed Jun 4 21:24:06 2025 +0900
+
+    Merge branch 'origin/node_tag_attachment_modifiy'
+
+[33mcommit 5d68857f1f8238484990d148cf30d268f728510d[m
+Merge: f4038cd 34c41e6
+Author: Park Jae Hong <105151063+PHJ2000@users.noreply.github.com>
+Date:   Wed Jun 4 21:17:34 2025 +0900
+
+    Merge pull request #4 from PHJ2000/feature/dbtest
+    
+    feat: implement all core API endpoints (auth, users, projects, nodes, tags)
+
+[33mcommit 34c41e60112e53f9c25a8b4153f541539c701f93[m[33m ([m[1;31morigin/feature/dbtest[m[33m)[m
+Merge: 26c786f f4038cd
+Author: Park Jae Hong <105151063+PHJ2000@users.noreply.github.com>
+Date:   Wed Jun 4 21:14:53 2025 +0900
+
+    Merge remote-tracking branch 'origin/main' into feature/dbtest
+
+[33mcommit 26c786f2a545be7ed821366877871d573c9684d0[m
+Author: Park Jae Hong <105151063+PHJ2000@users.noreply.github.com>
+Date:   Wed Jun 4 21:14:13 2025 +0900
+
+    feat: complete full API integration for auth, users, projects, nodes, tags
+    
+    - Implemented POST /auth/register and /auth/login
+    - Added user profile endpoint GET /users/me
+    - Created full CRUD for /projects and nested /nodes
+    - Added tag management endpoints with node-tag linking
+    - Verified all routes are functional
+
+[33mcommit 60aee9135e4afde715094c2398596c0e4046a548[m[33m ([m[1;31morigin/origin/node_tag_attachment_modifiy[m[33m)[m
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Wed Jun 4 21:04:01 2025 +0900
+
+    dd
+
+[33mcommit a9602152b5418e0dcdb7147609a3598d75a2aab7[m
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Wed Jun 4 21:02:26 2025 +0900
+
+    change
+
+[33mcommit f4038cd6f1cb2e810d6884ae6551da8518f62d0b[m
+Merge: 610e293 786509c
+Author: Park Jae Hong <105151063+PHJ2000@users.noreply.github.com>
+Date:   Tue Jun 3 13:24:35 2025 +0900
+
+    Merge pull request #2 from PHJ2000/feature/store-routing-in-db
+    
+    Feature/store routing in db
+
+[33mcommit 786509cf63ec6ca08fbd5e1cf02bc9b29c31737f[m[33m ([m[1;31morigin/feature/store-routing-in-db[m[33m)[m
+Merge: 6bc8935 610e293
+Author: Park Jae Hong <105151063+PHJ2000@users.noreply.github.com>
+Date:   Tue Jun 3 13:19:57 2025 +0900
+
+    Merge remote-tracking branch 'origin/main' into feature/store-routing-in-db
+
+[33mcommit 6bc8935fc1cec5d00c8fd63035876fe2e979f9e0[m
+Author: Park Jae Hong <105151063+PHJ2000@users.noreply.github.com>
+Date:   Tue Jun 3 13:14:43 2025 +0900
+
+    feat: DB에 라우터 연동 완료
+
+[33mcommit 0611d82ba1025e8aa4e82f6f5c319e7400887214[m
+Author: Park Jae Hong <105151063+PHJ2000@users.noreply.github.com>
+Date:   Tue Jun 3 10:17:02 2025 +0900
+
+    feat:Pydantic 스키마 동기화
+
+[33mcommit 543e8cd09d7b34969b174ca509935129c92484c8[m
+Author: Park Jae Hong <105151063+PHJ2000@users.noreply.github.com>
+Date:   Tue Jun 3 09:54:26 2025 +0900
+
+    feat: db/models파일 db테이블과 동기화
+
+[33mcommit 31bd10c9faf585e7c10651545da983bf0a26a83c[m[33m ([m[1;31morigin/front_dev[m[33m)[m
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Tue Jun 3 00:04:44 2025 +0900
+
+    feat: tag
+
+[33mcommit 80e4a67dceb7172dad29f3c116addc7cd2afdd25[m
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Mon Jun 2 22:54:37 2025 +0900
+
+    feat: create_ai_node
+
+[33mcommit 95fad081debcb03a417d29916321d12eb601b5dc[m
+Author: Park Jae Hong <105151063+PHJ2000@users.noreply.github.com>
+Date:   Mon Jun 2 22:10:55 2025 +0900
+
+    feat:db 연동
+
+[33mcommit 5cec775a0a073332d97d5c3cc40314659ae6b42f[m
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Sun Jun 1 23:58:13 2025 +0900
+
+    feat: project_in_cypo
+
+[33mcommit 7d09c0b0e8eac125ae85edd53d7aacbdeab6fb40[m
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Sun Jun 1 22:43:05 2025 +0900
+
+    feat: basic_front(soon branch)
+
+[33mcommit 610e2936a534fd49652c695d3360ac69df566a6d[m
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Sun Jun 1 18:30:37 2025 +0900
+
+    delete one line
+    
+    d
+
+[33mcommit 373ff1e9f7bd09610f377802d66fcdb0eacdfa26[m
+Merge: e3235c6 4aa7f31
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Sun Jun 1 18:24:29 2025 +0900
+
+    Merge branch 'Add_More_option_for_Node_and_Tag'
+
+[33mcommit 4aa7f310c0a594e25a45dea056f0433228b33353[m
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Sun Jun 1 18:18:23 2025 +0900
+
+    ff
+
+[33mcommit e3235c6f68efc664644df1f1ff2321dc6c61c4e0[m
+Author: Park Jae Hong <105151063+PHJ2000@users.noreply.github.com>
+Date:   Sun Jun 1 17:59:41 2025 +0900
+
+    fix:encoding error, add .gitattributes
+
+[33mcommit 7fcd1501f84d0d8b37a46d4f898c3cc2d6d5067b[m
+Author: Park Jae Hong <105151063+PHJ2000@users.noreply.github.com>
+Date:   Sun Jun 1 17:53:58 2025 +0900
+
+    fix:encoding error
+
+[33mcommit 4b8aa8c5b6d40f1783437b1f4b88a08f6164fe15[m
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Sun Jun 1 17:37:44 2025 +0900
+
+    fix: requirements.txt
+
+[33mcommit c3455a3bb6f11a6b25eb0a5ffff7e9a266b891db[m
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Sun Jun 1 17:30:11 2025 +0900
+
+    .
+
+[33mcommit 6084d8557451aaf515e76abe8c0e82ced891acbf[m
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Sun Jun 1 17:23:36 2025 +0900
+
+    fix: db migration
+
+[33mcommit cf68478dd6493c2f889120e244ed36f9b26a42b6[m
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Sun Jun 1 17:20:05 2025 +0900
+
+    fix: open api key2
+
+[33mcommit 3c0e6d2ee05607586602aaf40cc244864b04a0c1[m
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Sun Jun 1 17:17:18 2025 +0900
+
+    fix: open api key
+
+[33mcommit 6ddd63278b1d9e89d065c9e62470397a88f6adc7[m
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Sun Jun 1 17:10:36 2025 +0900
+
+    fix : db_migration
+
+[33mcommit 5d7909d867414f217f35131120b63acbd8c6c649[m
+Author: zopa2161 <126738169+zopa2161@users.noreply.github.com>
+Date:   Sun Jun 1 16:49:49 2025 +0900
+
+    add node function
+    
+ 
