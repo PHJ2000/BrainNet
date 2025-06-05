@@ -3,13 +3,20 @@
 import { useEffect, useRef, useState, memo } from "react";
 import cytoscape, { Core, ElementDefinition } from "cytoscape";
 import { v4 as uuidv4 } from "uuid";
-import { createAINodes as apiCreateAINodes } from "./nodeApi"; // AI 노드
+import {
+  createAINodes as apiCreateAINodes,
+  NodeOut,
+  createNode,        // ✅ 추가
+  activateNode as apiActivateNode,
+  updateNode,        // ✅ 추가
+  fetchNodes,
+} from "./nodeApi";  // ← 변경
 import {
   listTags,
   attachTag,
   detachTag,
   createTag,
-} from "@/features/projects/tagApi"; // 태그 API
+} from "@/features/projects/tagApi";
 import {
   Menu,
   Item,
@@ -34,15 +41,17 @@ export type NodeMeta = {
   x: number;
   y: number;
   parentId?: string;
+  depth: number;
+  order: number;
   opacity?: number;
   frozen?: boolean;
   status?: "ACTIVE" | "GHOST";
   generated?: boolean;
-  tags?: string[];            // ⬅️ 태그 id 배열
+  tags?: string[];
 };
 
 export interface GraphProps {
-  projectId: string;
+  projectId: number;
 }
 
 /* ──────────── Context-menu 컴포넌트 ─────────── */
@@ -67,7 +76,11 @@ const NodeContextMenu = memo(function NodeContextMenu({
     <Menu id={NODE_MENU_ID} animation="fade">
       <Submenu label="태그 달기…">
         {tags.map((t) => (
-          <Item key={t.id} disabled={nodeTags.includes(t.id)} onClick={() => onAdd(t.id)}>
+          <Item
+            key={t.id}
+            disabled={nodeTags.includes(t.id)}
+            onClick={() => onAdd(t.id)}
+          >
             {t.name}
           </Item>
         ))}
@@ -101,20 +114,42 @@ export default function Graph({ projectId }: GraphProps) {
   const cyInstance = useRef<Core | null>(null);
 
   /* ----- 상태 ----- */
-  const [nodes, setNodes] = useState<NodeMeta[]>([
-    {
-      id: "root",
-      label: "주제를 입력하세요",
-      x: 300,
-      y: 300,
-      opacity: 1,
-      status: "ACTIVE",
-    },
-  ]);
+  const [nodes, setNodes] = useState<NodeMeta[]>([]);
   const nodesRef = useRef(nodes);
   useEffect(() => {
     nodesRef.current = nodes;
   }, [nodes]);
+
+/* fetchNodes → setNodes 하는 useEffect 안을 이렇게 교체 */
+useEffect(() => {
+  fetchNodes(projectId)
+    .then(async (list) => {
+      const metas: NodeMeta[] = list.map((n) => ({
+        id: String(n.id),
+        label: n.content,
+        x: n.pos_x,
+        y: n.pos_y,
+        parentId: n.parent_id ? String(n.parent_id) : undefined,
+        depth: n.depth,
+        order: n.order_index,
+        status: n.state,
+        opacity: n.state === "GHOST" ? 0.3 : 1,
+        frozen: true,
+      }));
+
+      const next: NodeMeta[] = metas;
+      setNodes(next);
+      nodesRef.current = next;
+
+      /* 2️⃣ Cytoscape 화면을 갈아끼우기 */
+      if (cyInstance.current) {
+        cyInstance.current.elements().remove(); // 전부 지우고
+        addToCy(next);                          // 새 노드·엣지 추가
+      }
+    })
+    .catch(console.error);
+}, [projectId]);
+
 
   const [tags, setTags] = useState<Tag[]>([]);
   const [ctxNodeId, setCtxNodeId] = useState<string | null>(null);
@@ -206,13 +241,15 @@ export default function Graph({ projectId }: GraphProps) {
     }
   };
 
-  /* ----- AI, 자식 노드 생성 로직 (기존) ----- */
+  /* ----- AI·빈 노드 생성 로직 ----- */
   const spawnChildren = async (parent: NodeMeta) => {
     if (parent.generated) return;
+
     const isRoot = !parent.parentId;
     const childCnt = isRoot ? 3 : 2;
     const aiCnt = isRoot ? 2 : 1;
     const angles: number[] = [];
+
     if (isRoot) {
       const base = -Math.PI / 2;
       for (let i = 0; i < 3; i++) angles.push(base + (i * 2 * Math.PI) / 3);
@@ -222,25 +259,29 @@ export default function Graph({ projectId }: GraphProps) {
       angles.push(dir - Math.PI / 6, dir + Math.PI / 6);
     }
 
-    /* AI 제안 */
+    /* ── AI 제안 호출 ── */
     const aiGhosts: NodeMeta[] = [];
     try {
-      const res = await apiCreateAINodes(
-        projectId,
-        parent.label,
-        parent.x,
-        parent.y
-      );
-      const arr = Array.isArray(res) ? res.slice(0, aiCnt) : [];
-      for (let i = 0; i < aiCnt; i++) {
-        const srv = arr[i];
+      const srvNodes: NodeOut[] = await apiCreateAINodes(projectId, parent.label, {
+        x: parent.x,
+        y: parent.y,
+        depth: parent.depth + 1,
+        order: 0,
+        parent_id: /^\d+$/.test(parent.id) ? Number(parent.id) : undefined,
+      });
+
+      const take = Math.min(aiCnt, srvNodes.length);
+      for (let i = 0; i < take; i++) {
+        const srv = srvNodes[i];
         const { x, y } = polarToXY(parent.x, parent.y, radius, angles[i]);
         aiGhosts.push({
-          id: srv?.id ?? uuidv4(),
-          label: srv?.content ?? `AI 제안 ${i + 1}`,
+          id: String(srv.id),
+          label: srv.content,
           x,
           y,
           parentId: parent.id,
+          depth: srv.depth,
+          order: srv.order_index,
           opacity: 0.3,
           status: "GHOST",
           frozen: false,
@@ -250,23 +291,37 @@ export default function Graph({ projectId }: GraphProps) {
       console.error(e);
     }
 
-    /* 빈 노드 */
+    /* ── 빈(GHOST) 노드 ── */
     const blanks: NodeMeta[] = [];
     const blankCnt = childCnt - aiGhosts.length;
     for (let i = 0; i < blankCnt; i++) {
       const idx = aiGhosts.length + i;
       const { x, y } = polarToXY(parent.x, parent.y, radius, angles[idx]);
+
+      /* 🌟 ❷ 서버에 빈 노드 저장 (content = "") */
+      const blank = await createNode(projectId, {
+        content: "?",
+        x,
+        y,
+        depth: parent.depth + 1,
+        order: idx,
+        parent_id: Number(parent.id),
+      });
+
       blanks.push({
-        id: uuidv4(),
-        label: "?",
+        id: String(blank.id),
+        label: "?",          // UI 표시만 ?
         x,
         y,
         parentId: parent.id,
+        depth: blank.depth,
+        order: blank.order_index,
         opacity: 0.3,
-        status: "GHOST",
+        status: "GHOST",     // 프론트에서 GHOST 표현
         frozen: false,
       });
     }
+
 
     const children = [...aiGhosts, ...blanks];
     setNodes((p) => {
@@ -275,38 +330,119 @@ export default function Graph({ projectId }: GraphProps) {
       return next;
     });
     addToCy(children);
+
     parent.frozen = true;
     parent.generated = true;
   };
 
   /* ----- 노드 활성화 ----- */
-  const activateNode = (n: NodeMeta) => {
-    n.opacity = 1;
-    n.status = "ACTIVE";
-    n.frozen = true;
-    cyInstance.current?.$id(n.id).style("opacity", 1);
-  };
+  const activateNodeLocal = async (meta: NodeMeta) => {
+  try {
+    await apiActivateNode(projectId, Number(meta.id)); // ✅
+  } catch (e) {
+    console.error(e);
+    return;
+  }
 
-  /* ----- 클릭 & 우클릭 핸들러 ----- */
-  const handleTap = async (e: cytoscape.EventObject) => {
-    const id = e.target.id();
-    const cur = nodesRef.current.find((n) => n.id === id);
-    if (!cur) return;
+  meta.opacity = 1;
+  meta.status  = "ACTIVE";
+  meta.frozen  = true;
+  cyInstance.current?.$id(meta.id).style("opacity", 1);
+};
 
-    if (cur.status === "GHOST") {
-      activateNode(cur);
-      return;
+/* ───── 헬퍼 ───── */
+// const isNumericId = (s: string) => /^\d+$/.test(s);
+
+/* ───── handleTap 교체 ───── */
+const handleTap = async (e: cytoscape.EventObject) => {
+  const oldId = e.target.id();
+  const cur   = nodesRef.current.find((n) => n.id === oldId);
+  if (!cur) return;
+
+  /* 1) AI GHOST (서버에 이미 있음) → 바로 activate */
+  if (cur.status === "GHOST") {
+    await activateNodeLocal(cur);
+    return;
+  }
+
+  // /* 2) 서버에 아직 없는 노드(루트·“?”) → prompt + createNode */
+  // if (cur.status === "GHOST") {
+  //   const input = window.prompt("노드 내용을 입력하세요", cur.label);
+  //   if (!input) return;
+
+  //   try {
+  //     const saved = await createNode(projectId, {
+  //       content: input,
+  //       x: cur.x,
+  //       y: cur.y,
+  //       depth: cur.depth,
+  //       order: cur.order,
+  //       parent_id: cur.parentId ? Number(cur.parentId) : null,
+  //     });
+
+  //     /* ──── 🔽 여기부터 기존 코드 대신 넣으세요 ──── */
+  //     const newId = String(saved.id);
+  //     const cy = cyInstance.current!;
+  //     const oldEle   = cy.$id(oldId);          // placeholder
+  //     const position = oldEle.position();      // 좌표 보존
+
+  //     // ① placeholder 삭제
+  //     oldEle.remove();
+
+  //     // ② 새 노드 + (부모 엣지) 추가
+  //     const newEles: ElementDefinition[] = [
+  //       { data: { id: newId, label: saved.content }, position },
+  //     ];
+  //     if (cur.parentId) {
+  //       newEles.push({
+  //         data: {
+  //           id: `e-${cur.parentId}-${newId}`,
+  //           source: cur.parentId,
+  //           target: newId,
+  //         },
+  //       });
+  //     }
+  //     cy.add(newEles);
+
+  //     // ③ 프론트 상태 업데이트
+  //     cur.id     = newId;
+  //     cur.label  = saved.content;
+  //     cur.status = "ACTIVE";
+  //     cur.opacity = 1;
+  //     cur.frozen  = true;
+
+  //     // ④ 자식 노드 생성으로 이어가기
+  //     await spawnChildren(cur);
+
+  //     /* ──── 🔼 여기까지 ──── */
+
+  //   } catch (err) {
+  //     console.error(err);
+  //   }
+  //   return;
+  // }
+
+  /* 3) 이미 ACTIVE + 숫자 ID → 라벨 수정(updateNode) */
+  const newLabel = window.prompt("노드 내용을 수정하세요", cur.label);
+  if (!newLabel || newLabel === cur.label) return;
+
+  try {
+    await updateNode(projectId, Number(cur.id), { content: newLabel });
+    cur.label = newLabel;
+    cyInstance.current?.$id(cur.id).data("label", newLabel);
+
+    /* ✅ 내용이 바뀐 첫 클릭이라면 spawnChildren */
+    if (!cur.generated) {
+      await spawnChildren(cur);
     }
 
-    if (cur.generated) return;
+  } catch (err) {
+    console.error(err);
+  }
+};
 
-    const newLabel = window.prompt("노드 내용을 입력하세요", cur.label);
-    if (!newLabel) return;
-    cur.label = newLabel;
-    cyInstance.current?.$id(id).data("label", newLabel);
 
-    await spawnChildren(cur);
-  };
+
 
   /* ----- cytoscape init ----- */
   useEffect(() => {
@@ -351,8 +487,8 @@ export default function Graph({ projectId }: GraphProps) {
       const nodeId = ev.target.id();
       setCtxNodeId(nodeId);
       showMenu({
-        event: ev.originalEvent,   // 마우스 이벤트
-        props: { nodeId }          // 커스텀 데이터
+        event: ev.originalEvent as MouseEvent,
+        props: { nodeId },
       });
     });
 
