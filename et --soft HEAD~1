@@ -1,0 +1,12 @@
+[33mcommit 5028390051aca0b010f40ffb937ca30dbe9173df[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mold_8[m[33m)[m
+Merge: af49fe5 edfc85a
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Thu Jun 5 21:25:34 2025 +0900
+
+    Merge branch 'old_8' of https://github.com/PHJ2000/BrainNet into old_8
+
+[33mcommit af49fe50ce4b32bfa5da9ac8e8decf19afd8c872[m
+Author: LeeSeungJae <eaios@LeeSeungJaeui-MacBookAir.local>
+Date:   Thu Jun 5 21:22:57 2025 +0900
+
+    feat: new_project2
