@@ -145,14 +145,14 @@ export default function Graph({ projectId }: GraphProps) {
       },
       ...(n.parentId
         ? [
-            {
-              data: {
-                id: `e-${n.parentId}-${n.id}`,
-                source: n.parentId,
-                target: n.id,
-              },
+          {
+            data: {
+              id: `e-${n.parentId}-${n.id}`,
+              source: n.parentId,
+              target: n.id,
             },
-          ]
+          },
+        ]
         : []),
     ]);
     cy.add(eles);
@@ -319,6 +319,7 @@ export default function Graph({ projectId }: GraphProps) {
         {
           selector: "node",
           style: {
+            "shape": "roundrectangle",             // ← 둥근 사각형
             "background-color": "#0074D9",
             label: "data(label)",
             color: "#fff",
@@ -326,6 +327,14 @@ export default function Graph({ projectId }: GraphProps) {
             "text-halign": "center",
             "font-size": 12,
             opacity: "data(opacity)" as any,
+            "width": "label",                      // ← 텍스트 길이에 맞게
+            "height": "label",                     // ← 텍스트 높이에 맞게
+            "padding": "10px",                     // ← 텍스트와 테두리 간격
+            "border-radius": "10px",               // ← 더 둥글게 하고 싶으면 조절
+            "min-width": 50,                       // ← 최소 너비(옵션)
+            "min-height": 30,                      // ← 최소 높이(옵션)
+            "text-wrap": "wrap",                   // ← 긴 내용 줄바꿈
+            "text-max-width": 100                  // ← 줄바꿈시 최대 폭(px)
           },
         },
         {
