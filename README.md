@@ -68,6 +68,78 @@ AI 추천으로 **창의적 사고의 폭**을 넓히고, 노드 색상·두께�
 프론트엔드: Next.js와 Cytoscape.js 기반으로 구현되어 아이디어를 노드 및 그래프 형태로 시각화합니다. 로그인, 회원가입, 대시보드, 프로젝트 관리 기능을 제공합니다.
 
 백엔드: FastAPI와 PostgreSQL을 기반으로 RESTful API를를 지원하며, 사용자 관리, 아이디어 데이터 관리, 프로젝트 히스토리 관리를 수행합니다.
+
+
+## 📑 API 요약
+
+> Swagger UI: <http://localhost:8000/docs>  
+> 모든 엔드포인트는 `application/json` 을 사용하며 JWT 헤더(`Authorization: Bearer <token>`)가 필요합니다.  
+> **싱글-유저 버전**이라 WebSocket 브로드캐스트는 비활성화되어 있지만, REST 스펙은 유지됩니다.
+
+### 🔐 Auth
+| Method | Endpoint | 설명 |
+| ------ | -------- | ---- |
+| `POST` | `/auth/register` | 이메일·비밀번호 회원가입 |
+| `POST` | `/auth/login` | 로그인 & JWT 발급 |
+
+### 👤 Users
+| Method | Endpoint | 설명 |
+| ------ | -------- | ---- |
+| `GET` | `/users/me` | 내 프로필 조회 |
+| `GET` | `/users/me/tag-summaries` | 내가 사용한 태그별 노드 수 통계 |
+
+### 📂 Projects
+| Method | Endpoint | 설명 |
+| ------ | -------- | ---- |
+| `GET` | `/projects` | 프로젝트 목록 |
+| `POST` | `/projects` | 새 프로젝트 생성 |
+| `GET` | `/projects/{project_id}` | 프로젝트 상세 + 노드 트리 |
+| `PUT` / `PATCH` | `/projects/{project_id}` | 이름·옵션 수정 |
+| `DELETE` | `/projects/{project_id}` | 프로젝트 삭제 |
+| `POST` | `/projects/{project_id}/invite` | (협업 버전) 초대 링크 발행 |
+| `POST` | `/projects/join` | 초대 코드로 참여 |
+| `GET` | `/projects/{project_id}/summary` | 노드·태그·투표 요약 통계 |
+
+### 🌳 Nodes
+| Method | Endpoint | 설명 |
+| ------ | -------- | ---- |
+| `GET` | `/projects/{project_id}/nodes` | 노드 리스트 |
+| `POST` | `/projects/{project_id}/nodes` | 노드 대량 생성(AI 추천 결과 포함) |
+| `PATCH` | `/projects/{project_id}/nodes/{node_id}` | 텍스트·위치·메타 수정 |
+| `DELETE` | `/projects/{project_id}/nodes/{node_id}` | 노드 삭제 |
+| `POST` | `/projects/{project_id}/nodes/{node_id}/activate` | 노드 활성화 |
+| `POST` | `/projects/{project_id}/nodes/{node_id}/deactivate` | 노드 비활성화 |
+
+### 🏷️ Tags
+| Method | Endpoint | 설명 |
+| ------ | -------- | ---- |
+| `GET` | `/projects/{project_id}/tags` | 태그 목록 |
+| `POST` | `/projects/{project_id}/tags` | 태그 생성 |
+| `GET` | `/projects/{project_id}/tags/{tag_id}` | 태그 상세 |
+| `PATCH` | `/projects/{project_id}/tags/{tag_id}` | 태그 수정 |
+| `DELETE` | `/projects/{project_id}/tags/{tag_id}` | 태그 삭제 |
+| `POST` | `/projects/{project_id}/tags/{tag_id}/nodes/{node_id}` | 노드에 태그 부착 |
+| `DELETE` | `/projects/{project_id}/tags/{tag_id}/nodes/{node_id}` | 노드에서 태그 제거 |
+
+### 👍 Votes
+| Method | Endpoint | 설명 |
+| ------ | -------- | ---- |
+| `POST` | `/projects/{project_id}/tags/{tag_id}/vote` | 태그 단위 투표 |
+| `POST` | `/projects/{project_id}/votes/confirm` | 투표 결과 확정 |
+
+### 🕑 History
+| Method | Endpoint | 설명 |
+| ------ | -------- | ---- |
+| `GET` | `/projects/{project_id}/history` | 스냅샷 타임라인 |
+| `GET` | `/projects/{project_id}/history/{entry_id}` | 특정 스냅샷 내용 |
+
+> **스키마** – Swagger UI 상단의 `Schemas` 탭에서  
+> `ProjectOut`, `NodeOut`, `TagOut`, `VoteOut` 등 응답 구조를 확인할 수 있습니다.
+
+## ERD 다이어 그램
+
+
+
 ### 디렉터리 구조
 
 ```
