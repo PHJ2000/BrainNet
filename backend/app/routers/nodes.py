@@ -39,7 +39,7 @@ async def _gen_ai_nodes(project_id: int,body: NodeCreate, prompt: str, db: Async
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "당신은 창의적인 아이디어를 제공하는 도우미입니다."},
-                {"role": "user", "content": f"다음 주제와 관련된 새로운 아이디어를 문장 형태로 두 개 작성해줘: {prompt}"}
+                {"role": "user", "content": f"다음 주제와 관련된 새로운 아이디어를 간략한 문장 형태로 두 개 작성해줘: {prompt}"}
             ],
             max_tokens=256,
             temperature=0.7,

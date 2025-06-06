@@ -34,9 +34,9 @@ export default function Sidebar() {
         {/* + 버튼도 같은 목록 안에 배치 */}
         <button
           onClick={() => setModalOpen(true)}
-          className="flex items-center text-sm text-gray-500 hover:text-black px-2 py-1 rounded hover:bg-gray-100 border border-dashed border-gray-300 mt-2"
+          className="flex items-center justify-center w-full text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-purple-500 py-2 mt-4 rounded-xl shadow hover:from-blue-700 hover:to-purple-700 transition-all"
         >
-          <Plus size={16} className="mr-1" />
+          <Plus size={18} className="mr-2" />
           새 프로젝트
         </button>
       </div>

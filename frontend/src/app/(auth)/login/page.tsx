@@ -56,11 +56,11 @@ export default function LoginPage() {
       </button>
 
       {/* 부가 링크(선택사항) */}
-      {/* 
+      {
       <div className="text-center text-sm text-gray-400 mt-4">
         계정이 없으신가요? <a href="/register" className="text-blue-700 font-semibold hover:underline">회원가입</a>
       </div>
-      */}
+      }
     </form>
   );
 }

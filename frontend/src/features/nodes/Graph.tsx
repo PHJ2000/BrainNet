@@ -48,6 +48,9 @@ export type NodeMeta = {
   status?: "ACTIVE" | "GHOST";
   generated?: boolean;
   tags?: string[];
+  // 자동 크기 조절용
+  width?: number;   // 👈 추가!
+  height?: number;  // 👈 추가!
 };
 
 export interface GraphProps {
@@ -107,6 +110,34 @@ function useNodeMenu() {
   const { show } = useContextMenu({ id: NODE_MENU_ID });
   return show;
 }
+function measureNodeSize(label: string, maxWidth = 220, font = "bold 18px Arial") {
+  // 텍스트 줄수와 최대 가로길이에 따라 width, height 산출
+  const canvas = document.createElement("canvas");
+  const ctx = canvas.getContext("2d")!;
+  ctx.font = font;
+
+  // 줄 단위로 나누기 (text-wrap용)
+  const words = label.split(' ');
+  let lines: string[] = [];
+  let curLine = '';
+
+  for (let word of words) {
+    const testLine = curLine ? curLine + ' ' + word : word;
+    if (ctx.measureText(testLine).width > maxWidth && curLine) {
+      lines.push(curLine);
+      curLine = word;
+    } else {
+      curLine = testLine;
+    }
+  }
+  if (curLine) lines.push(curLine);
+
+  const widest = Math.max(...lines.map(l => ctx.measureText(l).width), 70);
+  const width = Math.min(Math.max(widest + 40, 110), 350); // min/max clamp
+  const height = lines.length * 26 + 30; // 한 줄 26px, +패딩
+
+  return { width, height };
+}
 
 /* ──────────── 그래프 컴포넌트 ─────────── */
 export default function Graph({ projectId }: GraphProps) {
@@ -120,36 +151,38 @@ export default function Graph({ projectId }: GraphProps) {
     nodesRef.current = nodes;
   }, [nodes]);
 
-/* fetchNodes → setNodes 하는 useEffect 안을 이렇게 교체 */
-useEffect(() => {
-  fetchNodes(projectId)
-    .then(async (list) => {
-      const metas: NodeMeta[] = list.map((n) => ({
-        id: String(n.id),
-        label: n.content,
-        x: n.pos_x,
-        y: n.pos_y,
-        parentId: n.parent_id ? String(n.parent_id) : undefined,
-        depth: n.depth,
-        order: n.order_index,
-        status: n.state,
-        opacity: n.state === "GHOST" ? 0.3 : 1,
-        frozen: true,
-      }));
+  /* fetchNodes → setNodes 하는 useEffect 안을 이렇게 교체 */
+  useEffect(() => {
+    fetchNodes(projectId)
+      .then(async (list) => {
+        const metas: NodeMeta[] = list.map((n) => {
+          const { width, height } = measureNodeSize(n.content ?? "");
+          return {
+            id: String(n.id),
+            label: n.content,
+            x: n.pos_x,
+            y: n.pos_y,
+            parentId: n.parent_id ? String(n.parent_id) : undefined,
+            depth: n.depth,
+            order: n.order_index,
+            status: n.state,
+            opacity: n.state === "GHOST" ? 0.3 : 1,
+            frozen: true,
+            width,            // ⬅️ 반영
+            height,           // ⬅️ 반영
+          };
+        });
 
-      const next: NodeMeta[] = metas;
-      setNodes(next);
-      nodesRef.current = next;
+        setNodes(metas);
+        nodesRef.current = metas;
 
-      /* 2️⃣ Cytoscape 화면을 갈아끼우기 */
-      if (cyInstance.current) {
-        cyInstance.current.elements().remove(); // 전부 지우고
-        addToCy(next);                          // 새 노드·엣지 추가
-      }
-    })
-    .catch(console.error);
-}, [projectId]);
-
+        if (cyInstance.current) {
+          cyInstance.current.elements().remove();
+          addToCy(metas);
+        }
+      })
+      .catch(console.error);
+  }, [projectId]);
 
   const [tags, setTags] = useState<Tag[]>([]);
   const [ctxNodeId, setCtxNodeId] = useState<string | null>(null);
@@ -172,24 +205,25 @@ useEffect(() => {
   const addToCy = (arr: NodeMeta[]) => {
     const cy = cyInstance.current;
     if (!cy) return;
-    const eles: ElementDefinition[] = arr.flatMap((n) => [
-      {
-        data: { id: n.id, label: n.label },
-        position: { x: n.x, y: n.y },
-        style: { opacity: n.opacity ?? 1 },
-      },
-      ...(n.parentId
-        ? [
-          {
+    const eles: ElementDefinition[] = arr.flatMap((n) => {
+      // 이미 width, height가 있으므로 재계산 필요 없음
+      return [
+        {
+          data: { id: n.id, label: n.label, width: n.width, height: n.height },
+          position: { x: n.x, y: n.y },
+          style: { opacity: n.opacity ?? 1 },
+        },
+        ...(n.parentId
+          ? [{
             data: {
               id: `e-${n.parentId}-${n.id}`,
               source: n.parentId,
               target: n.id,
             },
-          },
-        ]
-        : []),
-    ]);
+          }]
+          : []),
+      ];
+    });
     cy.add(eles);
   };
 
@@ -285,6 +319,7 @@ useEffect(() => {
           opacity: 0.3,
           status: "GHOST",
           frozen: false,
+          ...measureNodeSize(srv.content),
         });
       }
     } catch (e) {
@@ -306,6 +341,7 @@ useEffect(() => {
         depth: parent.depth + 1,
         order: idx,
         parent_id: Number(parent.id),
+
       });
 
       blanks.push({
@@ -319,6 +355,7 @@ useEffect(() => {
         opacity: 0.3,
         status: "GHOST",     // 프론트에서 GHOST 표현
         frozen: false,
+        ...measureNodeSize("?"),
       });
     }
 
@@ -337,27 +374,27 @@ useEffect(() => {
 
   /* ----- 노드 활성화 ----- */
   const activateNodeLocal = async (meta: NodeMeta) => {
-  try {
-    await apiActivateNode(projectId, Number(meta.id)); // ✅
-  } catch (e) {
-    console.error(e);
-    return;
-  }
+    try {
+      await apiActivateNode(projectId, Number(meta.id)); // ✅
+    } catch (e) {
+      console.error(e);
+      return;
+    }
 
-  meta.opacity = 1;
-  meta.status  = "ACTIVE";
-  meta.frozen  = true;
-  cyInstance.current?.$id(meta.id).style("opacity", 1);
-};
+    meta.opacity = 1;
+    meta.status = "ACTIVE";
+    meta.frozen = true;
+    cyInstance.current?.$id(meta.id).style("opacity", 1);
+  };
 
-/* ───── 헬퍼 ───── */
-// const isNumericId = (s: string) => /^\d+$/.test(s);
+  /* ───── 헬퍼 ───── */
+  // const isNumericId = (s: string) => /^\d+$/.test(s);
 
-/* ───── handleTap 교체 ───── */
-const handleTap = async (e: cytoscape.EventObject) => {
-  const oldId = e.target.id();
-  const cur   = nodesRef.current.find((n) => n.id === oldId);
-  if (!cur) return;
+  /* ───── handleTap 교체 ───── */
+  const handleTap = async (e: cytoscape.EventObject) => {
+    const oldId = e.target.id();
+    const cur = nodesRef.current.find((n) => n.id === oldId);
+    if (!cur) return;
 
   /* 1) AI GHOST (서버에 이미 있음) → 바로 activate */
   if (cur.status === "GHOST") {
@@ -400,76 +437,86 @@ const handleTap = async (e: cytoscape.EventObject) => {
   //   const input = window.prompt("노드 내용을 입력하세요", cur.label);
   //   if (!input) return;
 
-  //   try {
-  //     const saved = await createNode(projectId, {
-  //       content: input,
-  //       x: cur.x,
-  //       y: cur.y,
-  //       depth: cur.depth,
-  //       order: cur.order,
-  //       parent_id: cur.parentId ? Number(cur.parentId) : null,
-  //     });
+    //   try {
+    //     const saved = await createNode(projectId, {
+    //       content: input,
+    //       x: cur.x,
+    //       y: cur.y,
+    //       depth: cur.depth,
+    //       order: cur.order,
+    //       parent_id: cur.parentId ? Number(cur.parentId) : null,
+    //     });
 
-  //     /* ──── 🔽 여기부터 기존 코드 대신 넣으세요 ──── */
-  //     const newId = String(saved.id);
-  //     const cy = cyInstance.current!;
-  //     const oldEle   = cy.$id(oldId);          // placeholder
-  //     const position = oldEle.position();      // 좌표 보존
+    //     /* ──── 🔽 여기부터 기존 코드 대신 넣으세요 ──── */
+    //     const newId = String(saved.id);
+    //     const cy = cyInstance.current!;
+    //     const oldEle   = cy.$id(oldId);          // placeholder
+    //     const position = oldEle.position();      // 좌표 보존
 
-  //     // ① placeholder 삭제
-  //     oldEle.remove();
+    //     // ① placeholder 삭제
+    //     oldEle.remove();
 
-  //     // ② 새 노드 + (부모 엣지) 추가
-  //     const newEles: ElementDefinition[] = [
-  //       { data: { id: newId, label: saved.content }, position },
-  //     ];
-  //     if (cur.parentId) {
-  //       newEles.push({
-  //         data: {
-  //           id: `e-${cur.parentId}-${newId}`,
-  //           source: cur.parentId,
-  //           target: newId,
-  //         },
-  //       });
-  //     }
-  //     cy.add(newEles);
+    //     // ② 새 노드 + (부모 엣지) 추가
+    //     const newEles: ElementDefinition[] = [
+    //       { data: { id: newId, label: saved.content }, position },
+    //     ];
+    //     if (cur.parentId) {
+    //       newEles.push({
+    //         data: {
+    //           id: `e-${cur.parentId}-${newId}`,
+    //           source: cur.parentId,
+    //           target: newId,
+    //         },
+    //       });
+    //     }
+    //     cy.add(newEles);
 
-  //     // ③ 프론트 상태 업데이트
-  //     cur.id     = newId;
-  //     cur.label  = saved.content;
-  //     cur.status = "ACTIVE";
-  //     cur.opacity = 1;
-  //     cur.frozen  = true;
+    //     // ③ 프론트 상태 업데이트
+    //     cur.id     = newId;
+    //     cur.label  = saved.content;
+    //     cur.status = "ACTIVE";
+    //     cur.opacity = 1;
+    //     cur.frozen  = true;
 
-  //     // ④ 자식 노드 생성으로 이어가기
-  //     await spawnChildren(cur);
+    //     // ④ 자식 노드 생성으로 이어가기
+    //     await spawnChildren(cur);
 
-  //     /* ──── 🔼 여기까지 ──── */
+    //     /* ──── 🔼 여기까지 ──── */
 
-  //   } catch (err) {
-  //     console.error(err);
-  //   }
-  //   return;
-  // }
+    //   } catch (err) {
+    //     console.error(err);
+    //   }
+    //   return;
+    // }
 
-  /* 3) 이미 ACTIVE + 숫자 ID → 라벨 수정(updateNode) */
-  const newLabel = window.prompt("노드 내용을 수정하세요", cur.label);
-  if (!newLabel || newLabel === cur.label) return;
+    /* 3) 이미 ACTIVE + 숫자 ID → 라벨 수정(updateNode) */
+    const newLabel = window.prompt("노드 내용을 수정하세요", cur.label);
+    if (!newLabel || newLabel === cur.label) return;
 
-  try {
-    await updateNode(projectId, Number(cur.id), { content: newLabel });
+    // ... handleTap 내에서 label이 바뀐 경우
+    const { width, height } = measureNodeSize(newLabel);
     cur.label = newLabel;
-    cyInstance.current?.$id(cur.id).data("label", newLabel);
+    cur.width = width;
+    cur.height = height;
+    cyInstance.current?.$id(cur.id).data({
+      label: newLabel,
+      width,
+      height,
+    });
+    try {
+      await updateNode(projectId, Number(cur.id), { content: newLabel });
+      cur.label = newLabel;
+      cyInstance.current?.$id(cur.id).data("label", newLabel);
 
-    /* ✅ 내용이 바뀐 첫 클릭이라면 spawnChildren */
-    if (!cur.generated) {
-      await spawnChildren(cur);
+      /* ✅ 내용이 바뀐 첫 클릭이라면 spawnChildren */
+      if (!cur.generated) {
+        await spawnChildren(cur);
+      }
+
+    } catch (err) {
+      console.error(err);
     }
-
-  } catch (err) {
-    console.error(err);
-  }
-};
+  };
 
 
 
@@ -481,36 +528,51 @@ const handleTap = async (e: cytoscape.EventObject) => {
       container: cyRef.current,
       elements: [],
       layout: { name: "preset" },
-      style: [
+      "style": [
         {
-          selector: "node",
-          style: {
-            // "shape": "roundrectangle",             // ← 둥근 사각형
-            "background-color": "#0074D9",
-            label: "data(label)",
-            color: "#fff",
+          "selector": "node",
+          "style": {
+            "shape": "roundrectangle",
+            "background-color": "mapData(status, 'ACTIVE', '#6366f1', 'GHOST', '#e5e7eb')",
+            "border-width": 3,
+            "border-color": "mapData(status, 'ACTIVE', '#6366f1', 'GHOST', '#d1d5db')",
+            "label": "data(label)",
+            "color": "mapData(status, 'ACTIVE', '#fff', 'GHOST', '#a1a1aa')",
+            "font-weight": "bold",
+            "font-size": 18,
             "text-valign": "center",
             "text-halign": "center",
-            "font-size": 12,
-            opacity: "data(opacity)" as any,
-            // "width": "label",                      // ← 텍스트 길이에 맞게
-            // "height": "label",                     // ← 텍스트 높이에 맞게
-            // "padding": "10px",                     // ← 텍스트와 테두리 간격
-            // "border-radius": "10px",               // ← 더 둥글게 하고 싶으면 조절
-            // "min-width": 50,                       // ← 최소 너비(옵션)
-            // "min-height": 30,                      // ← 최소 높이(옵션)
-            // "text-wrap": "wrap",                   // ← 긴 내용 줄바꿈
-            // "text-max-width": 100                  // ← 줄바꿈시 최대 폭(px)
+            "padding": "22px",
+            "border-radius": "18px",
+            // 크기를 data로부터!
+            "width": "data(width)",
+            "height": "data(height)",
+            // "min-width": 110,  (이제 필요 없음)
+            // "max-width": 350,  (data에서 clamp)
+            // "min-height": 50,  (data에서 clamp)
+            "text-wrap": "wrap",
+            "text-max-width": 220,
+            "opacity": "mapData(status, 'ACTIVE', 1, 'GHOST', 0.45)",
+          }
+        },
+        {
+          selector: "node:selected",
+          style: {
+            "background-color": "#f472b6",
+            "border-color": "#fbcfe8",
+            "color": "#fff",
+            "opacity": 1,
           },
         },
         {
           selector: "edge",
           style: {
-            width: 2,
-            "line-color": "#ccc",
-            "target-arrow-color": "#ccc",
+            "width": 2.5,
+            "line-color": "#a5b4fc",
+            "target-arrow-color": "#a5b4fc",
             "target-arrow-shape": "triangle",
             "curve-style": "bezier",
+            "opacity": 0.95,
           },
         },
       ],
@@ -521,7 +583,6 @@ const handleTap = async (e: cytoscape.EventObject) => {
 
     cy.on("tap", "node", handleTap);
 
-    /* 우클릭 메뉴 */
     cy.on("cxttap", "node", (ev) => {
       const nodeId = ev.target.id();
       setCtxNodeId(nodeId);
@@ -536,7 +597,6 @@ const handleTap = async (e: cytoscape.EventObject) => {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
   /* ----- 렌더 ----- */
   return (
     <>
