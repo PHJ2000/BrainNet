@@ -5,8 +5,8 @@ from datetime import datetime
 
 class NodeCreate(BaseModel):
     content: Optional[str] = None
-    x: Optional[float] = None
-    y: Optional[float] = None
+    pos_x: Optional[float] = None
+    pos_y: Optional[float] = None
     depth: Optional[int] = 0
     order: Optional[int] = 0
     ai_prompt: Optional[str] = None
@@ -14,8 +14,8 @@ class NodeCreate(BaseModel):
 
 class NodeUpdate(BaseModel):
     content: Optional[str] = None
-    x: Optional[float] = None
-    y: Optional[float] = None
+    pos_x: Optional[float] = None
+    pos_y: Optional[float] = None
     depth: Optional[int] = None
     order: Optional[int] = None
 

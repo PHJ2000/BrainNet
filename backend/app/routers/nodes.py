@@ -3,6 +3,7 @@
 import uuid, re, openai, os
 from typing import List, Optional
 
+
 from fastapi import APIRouter, Depends, Query, Path, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, insert, update, delete
@@ -60,8 +61,8 @@ async def _gen_ai_nodes(project_id: int,body: NodeCreate, prompt: str, db: Async
             state=NodeStateEnum.GHOST,
             depth=body.depth or 0,
             order_index=idx,
-            pos_x=body.x or 0.0,
-            pos_y=body.y or 0.0,
+            pos_x=body.pos_x or 0.0,
+            pos_y=body.pos_y or 0.0,
         )
         db.add(new_node)
         await db.flush()
@@ -125,8 +126,8 @@ async def create_nodes(
         state=NodeStateEnum.ACTIVE,
         depth=body.depth or 0,
         order_index=body.order or 0,
-        pos_x=body.x or 0.0,
-        pos_y=body.y or 0.0,
+        pos_x=body.pos_x or 0.0,
+        pos_y=body.pos_y or 0.0,
     )
     db.add(new_node)
     await db.commit()
@@ -161,16 +162,17 @@ async def update_node(
     node = result.scalar_one_or_none()
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
-
+    print("log")
+    print(body.pos_x)
     updated = False
     if body.content is not None:
         node.content = body.content
         updated = True
-    if body.x is not None:
-        node.pos_x = body.x
+    if body.pos_x is not None:
+        node.pos_x = body.pos_x
         updated = True
-    if body.y is not None:
-        node.pos_y = body.y
+    if body.pos_y is not None:
+        node.pos_y = body.pos_y
         updated = True
     if body.depth is not None:
         node.depth = body.depth

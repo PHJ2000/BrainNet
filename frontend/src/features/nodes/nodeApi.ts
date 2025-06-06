@@ -61,8 +61,8 @@ export async function createAINodes(
   projectId: number | string,
   aiPrompt: string,
   opts: {
-    x?: number;
-    y?: number;
+    pos_x?: number;
+    pos_y?: number;
     depth?: number;
     order?: number;
     parent_id?: number | string | null;

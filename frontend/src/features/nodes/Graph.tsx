@@ -38,8 +38,8 @@ export interface Tag {
 export type NodeMeta = {
   id: string;
   label: string;
-  x: number;
-  y: number;
+  pos_x: number;
+  pos_y: number;
   parentId?: string;
   depth: number;
   order: number;
@@ -160,8 +160,8 @@ export default function Graph({ projectId }: GraphProps) {
           return {
             id: String(n.id),
             label: n.content,
-            x: n.pos_x,
-            y: n.pos_y,
+            pos_x: n.pos_x,
+            pos_y: n.pos_y,
             parentId: n.parent_id ? String(n.parent_id) : undefined,
             depth: n.depth,
             order: n.order_index,
@@ -210,7 +210,7 @@ export default function Graph({ projectId }: GraphProps) {
       return [
         {
           data: { id: n.id, label: n.label, width: n.width, height: n.height },
-          position: { x: n.x, y: n.y },
+          position: { x: n.pos_x, y: n.pos_y },
           style: { opacity: n.opacity ?? 1 },
         },
         ...(n.parentId
@@ -289,7 +289,7 @@ export default function Graph({ projectId }: GraphProps) {
       for (let i = 0; i < 3; i++) angles.push(base + (i * 2 * Math.PI) / 3);
     } else {
       const gp = nodesRef.current.find((x) => x.id === parent.parentId);
-      const dir = gp ? Math.atan2(parent.y - gp.y, parent.x - gp.x) : 0;
+      const dir = gp ? Math.atan2(parent.pos_y - gp.pos_y, parent.pos_x - gp.pos_x) : 0;
       angles.push(dir - Math.PI / 6, dir + Math.PI / 6);
     }
 
@@ -297,8 +297,8 @@ export default function Graph({ projectId }: GraphProps) {
     const aiGhosts: NodeMeta[] = [];
     try {
       const srvNodes: NodeOut[] = await apiCreateAINodes(projectId, parent.label, {
-        x: parent.x,
-        y: parent.y,
+        pos_x: parent.pos_x,
+        pos_y: parent.pos_y,
         depth: parent.depth + 1,
         order: 0,
         parent_id: /^\d+$/.test(parent.id) ? Number(parent.id) : undefined,
@@ -307,12 +307,12 @@ export default function Graph({ projectId }: GraphProps) {
       const take = Math.min(aiCnt, srvNodes.length);
       for (let i = 0; i < take; i++) {
         const srv = srvNodes[i];
-        const { x, y } = polarToXY(parent.x, parent.y, radius, angles[i]);
+        const { x, y } = polarToXY(parent.pos_x, parent.pos_y, radius, angles[i]);
         aiGhosts.push({
           id: String(srv.id),
           label: srv.content,
-          x,
-          y,
+          pos_x: x,
+          pos_y: y,
           parentId: parent.id,
           depth: srv.depth,
           order: srv.order_index,
@@ -331,7 +331,7 @@ export default function Graph({ projectId }: GraphProps) {
     const blankCnt = childCnt - aiGhosts.length;
     for (let i = 0; i < blankCnt; i++) {
       const idx = aiGhosts.length + i;
-      const { x, y } = polarToXY(parent.x, parent.y, radius, angles[idx]);
+      const { x, y } = polarToXY(parent.pos_x, parent.pos_y, radius, angles[idx]);
 
       /* 🌟 ❷ 서버에 빈 노드 저장 (content = "") */
       const blank = await createNode(projectId, {
@@ -347,8 +347,8 @@ export default function Graph({ projectId }: GraphProps) {
       blanks.push({
         id: String(blank.id),
         label: "?",          // UI 표시만 ?
-        x,
-        y,
+        pos_x: x,
+        pos_y: y,
         parentId: parent.id,
         depth: blank.depth,
         order: blank.order_index,
@@ -406,8 +406,8 @@ export default function Graph({ projectId }: GraphProps) {
         try {
           const saved = await updateNode(projectId, Number(cur.id), {
             content: input,
-            pos_x: cur.x,
-            pos_y: cur.y,
+            pos_x: cur.pos_x,
+            pos_y: cur.pos_y,
           });
 
           const cy = cyInstance.current!;
@@ -533,14 +533,15 @@ export default function Graph({ projectId }: GraphProps) {
           "selector": "node",
           "style": {
             "shape": "roundrectangle",
-            "background-color": "mapData(status, 'ACTIVE', '#f1f5fe', 'GHOST', '#f3f4f6')", // 파스텔 블루/연그레이
+            // ACTIVE: "#f1f5fe"(연파랑), GHOST: "#e6f0ff"(밝은 블루톤)
+            "background-color": "mapData(status, 'ACTIVE', '#f1f5fe', 'GHOST', '#e6f0ff')",
             "border-width": 0,
-            "box-shadow": "0 2px 20px 0 rgba(99, 102, 241, 0.10), 0 1.5px 7px 0 rgba(80,80,140,0.07)",
             "label": "data(label)",
-            "color": "mapData(status, 'ACTIVE', '#374151', 'GHOST', '#a1a1aa')", // 어두운 텍스트/회색
+            // ACTIVE: "#374151", GHOST: "#6366f1"(인디고)이나 "#94a3b8"(연그레이블루)
+            "color": "mapData(status, 'ACTIVE', '#374151', 'GHOST', '#94a3b8')",
             "font-weight": "600",
             "font-size": 17,
-            "letter-spacing": "0.02em",
+            "letter-spacing": "0.01em",
             "text-valign": "center",
             "text-halign": "center",
             "padding": "20px",
@@ -549,8 +550,8 @@ export default function Graph({ projectId }: GraphProps) {
             "height": "data(height)",
             "text-wrap": "wrap",
             "text-max-width": 210,
-            "opacity": "mapData(status, 'ACTIVE', 1, 'GHOST', 0.40)",
-            "transition-property": "background-color, color, opacity, box-shadow",
+            "opacity": "mapData(status, 'ACTIVE', 1, 'GHOST', 0.90)",   // 더 밝게
+            "transition-property": "background-color, color, opacity",
             "transition-duration": "0.2s"
           }
         },
@@ -583,12 +584,27 @@ export default function Graph({ projectId }: GraphProps) {
     addToCy(nodesRef.current);
 
     cy.on("tap", "node", handleTap);
+    //위치 변경시 이벤트
+    cy.on("dragfree", "node", async (event) => {
+      const node = event.target;
+      const id = node.id();
+      const pos = node.position();
+
+      try {
+        await updateNode(projectId, id, { pos_x: pos.x, pos_y: pos.y });
+        // NodeUpdatePayload 타입에 맞게 전달
+      } catch (err) {
+        console.error("노드 위치 업데이트 실패", err);
+      }
+    });
 
     cy.on("cxttap", "node", (ev) => {
+      ev.originalEvent.preventDefault();
+      ev.originalEvent.stopPropagation();
       const nodeId = ev.target.id();
       setCtxNodeId(nodeId);
       showMenu({
-        event: ev.originalEvent as MouseEvent,
+        event: ev.originalEvent,  // 반드시 native 이벤트 전달!
         props: { nodeId },
       });
     });
