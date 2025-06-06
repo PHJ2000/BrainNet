@@ -301,8 +301,8 @@ useEffect(() => {
       /* 🌟 ❷ 서버에 빈 노드 저장 (content = "") */
       const blank = await createNode(projectId, {
         content: "?",
-        x,
-        y,
+        pos_x: x,
+        pos_y: y,
         depth: parent.depth + 1,
         order: idx,
         parent_id: Number(parent.id),
@@ -369,6 +369,8 @@ const handleTap = async (e: cytoscape.EventObject) => {
     try {
       const saved = await updateNode(projectId, Number(cur.id), {
         content: input,
+        pos_x: cur.x,
+        pos_y: cur.y,
       });
 
       const cy = cyInstance.current!;
