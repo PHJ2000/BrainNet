@@ -109,17 +109,33 @@ async def create_nodes(
 ):
     await _m(int(uid), project_id, db)
 
-    # AI 모드: ai_prompt가 있으면 첫 번째 Ghost 노드만 반환 (여러 개 생성은 별도 구현 필요)
+    # ✅ 1. AI 모드: ai_prompt 처리
     if body.ai_prompt:
-        return await _gen_ai_nodes(project_id,body, body.ai_prompt, db,uid)
+        return await _gen_ai_nodes(project_id, body, body.ai_prompt, db, uid)
 
-    # content 필수 (여러 개 생성 가능하도록 리스트로 받는 게 더 좋음, 여기선 2번 반복)
+    # ✅ 2. content 필수 검사
     if not body.content:
         raise HTTPException(status_code=400, detail="content is required when ai_prompt absent")
 
+    # ✅ 3. 루트 노드인지 확인
+    is_root = body.parent_id in (None, 0, "", "0")
+
+    if is_root:
+        # ✅ 해당 프로젝트에 루트 노드가 이미 존재하는지 확인
+        result = await db.execute(
+            select(NodeORM).where(NodeORM.project_id == project_id, NodeORM.parent_id == None)
+        )
+        existing_root = result.scalars().first()
+        if existing_root:
+            raise HTTPException(
+                status_code=409,
+                detail="Root node already exists for this project."
+            )
+
+    # ✅ 4. 노드 생성
     new_node = NodeORM(
         project_id=project_id,
-        parent_id=body.parent_id if body.parent_id not in (None, 0, "", "0") else None,
+        parent_id=body.parent_id if not is_root else None,
         author_id=int(uid),
         content=body.content,
         state=NodeStateEnum.ACTIVE,
@@ -132,7 +148,7 @@ async def create_nodes(
     await db.commit()
     await db.refresh(new_node)
 
-    # 부모 노드가 태그를 가지고 있다면, 자식 노드에 동일 태그 연결 (예시)
+    # ✅ 5. 부모 태그 상속
     if body.parent_id is not None:
         parent_tags = await db.execute(
             select(TagNode.tag_id).where(TagNode.node_id == body.parent_id)
@@ -143,6 +159,7 @@ async def create_nodes(
         await db.commit()
 
     return [NodeOut.from_orm(new_node)]
+
 
 
 @router.patch("/{node_id}", response_model=NodeOut)
