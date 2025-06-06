@@ -396,46 +396,46 @@ export default function Graph({ projectId }: GraphProps) {
     const cur = nodesRef.current.find((n) => n.id === oldId);
     if (!cur) return;
 
-  /* 1) AI GHOST (서버에 이미 있음) → 바로 activate */
-  if (cur.status === "GHOST") {
-  if (cur.label === "?") {
-    // 서버에 빈 노드로만 생성된 경우 → 사용자 입력 받아서 내용 갱신
-    const input = window.prompt("노드 내용을 입력하세요", cur.label);
-    if (!input) return;
+    /* 1) AI GHOST (서버에 이미 있음) → 바로 activate */
+    if (cur.status === "GHOST") {
+      if (cur.label === "?") {
+        // 서버에 빈 노드로만 생성된 경우 → 사용자 입력 받아서 내용 갱신
+        const input = window.prompt("노드 내용을 입력하세요", cur.label);
+        if (!input) return;
 
-    try {
-      const saved = await updateNode(projectId, Number(cur.id), {
-        content: input,
-        pos_x: cur.x,
-        pos_y: cur.y,
-      });
+        try {
+          const saved = await updateNode(projectId, Number(cur.id), {
+            content: input,
+            pos_x: cur.x,
+            pos_y: cur.y,
+          });
 
-      const cy = cyInstance.current!;
-      const nodeEle = cy.$id(cur.id);
-      nodeEle.data("label", saved.content);
-      nodeEle.style("opacity", 1);
+          const cy = cyInstance.current!;
+          const nodeEle = cy.$id(cur.id);
+          nodeEle.data("label", saved.content);
+          nodeEle.style("opacity", 1);
 
-      cur.label = saved.content;
-      cur.opacity = 1;
-      cur.status = "ACTIVE";
-      cur.frozen = true;
+          cur.label = saved.content;
+          cur.opacity = 1;
+          cur.status = "ACTIVE";
+          cur.frozen = true;
 
-      await spawnChildren(cur);
-    } catch (err) {
-      console.error(err);
+          await spawnChildren(cur);
+        } catch (err) {
+          console.error(err);
+        }
+      } else {
+        // AI 생성된 노드 → 바로 activate
+        await activateNodeLocal(cur);
+      }
+      return;
     }
-  } else {
-    // AI 생성된 노드 → 바로 activate
-    await activateNodeLocal(cur);
-  }
-  return;
-}
 
 
-  // /* 2) 서버에 아직 없는 노드(루트·“?”) → prompt + createNode */
-  // if (cur.status === "GHOST") {
-  //   const input = window.prompt("노드 내용을 입력하세요", cur.label);
-  //   if (!input) return;
+    // /* 2) 서버에 아직 없는 노드(루트·“?”) → prompt + createNode */
+    // if (cur.status === "GHOST") {
+    //   const input = window.prompt("노드 내용을 입력하세요", cur.label);
+    //   if (!input) return;
 
     //   try {
     //     const saved = await createNode(projectId, {
@@ -533,46 +533,47 @@ export default function Graph({ projectId }: GraphProps) {
           "selector": "node",
           "style": {
             "shape": "roundrectangle",
-            "background-color": "mapData(status, 'ACTIVE', '#6366f1', 'GHOST', '#e5e7eb')",
-            "border-width": 3,
-            "border-color": "mapData(status, 'ACTIVE', '#6366f1', 'GHOST', '#d1d5db')",
+            "background-color": "mapData(status, 'ACTIVE', '#f1f5fe', 'GHOST', '#f3f4f6')", // 파스텔 블루/연그레이
+            "border-width": 0,
+            "box-shadow": "0 2px 20px 0 rgba(99, 102, 241, 0.10), 0 1.5px 7px 0 rgba(80,80,140,0.07)",
             "label": "data(label)",
-            "color": "mapData(status, 'ACTIVE', '#fff', 'GHOST', '#a1a1aa')",
-            "font-weight": "bold",
-            "font-size": 18,
+            "color": "mapData(status, 'ACTIVE', '#374151', 'GHOST', '#a1a1aa')", // 어두운 텍스트/회색
+            "font-weight": "600",
+            "font-size": 17,
+            "letter-spacing": "0.02em",
             "text-valign": "center",
             "text-halign": "center",
-            "padding": "22px",
-            "border-radius": "18px",
-            // 크기를 data로부터!
+            "padding": "20px",
+            "border-radius": "19px",
             "width": "data(width)",
             "height": "data(height)",
-            // "min-width": 110,  (이제 필요 없음)
-            // "max-width": 350,  (data에서 clamp)
-            // "min-height": 50,  (data에서 clamp)
             "text-wrap": "wrap",
-            "text-max-width": 220,
-            "opacity": "mapData(status, 'ACTIVE', 1, 'GHOST', 0.45)",
+            "text-max-width": 210,
+            "opacity": "mapData(status, 'ACTIVE', 1, 'GHOST', 0.40)",
+            "transition-property": "background-color, color, opacity, box-shadow",
+            "transition-duration": "0.2s"
           }
         },
         {
-          selector: "node:selected",
-          style: {
-            "background-color": "#f472b6",
-            "border-color": "#fbcfe8",
-            "color": "#fff",
+          "selector": "node:selected",
+          "style": {
+            "background-color": "#c7d2fe", // 강조색
+            "box-shadow": "0 2px 32px 0 rgba(99, 102, 241, 0.17)",
+            "color": "#3730a3",
+            "border-width": 2,
+            "border-color": "#6366f1",
             "opacity": 1,
-          },
+          }
         },
         {
-          selector: "edge",
-          style: {
+          "selector": "edge",
+          "style": {
             "width": 2.5,
-            "line-color": "#a5b4fc",
-            "target-arrow-color": "#a5b4fc",
+            "line-color": "#b4b8f5",
+            "target-arrow-color": "#b4b8f5",
             "target-arrow-shape": "triangle",
             "curve-style": "bezier",
-            "opacity": 0.95,
+            "opacity": 0.8,
           },
         },
       ],
@@ -600,7 +601,14 @@ export default function Graph({ projectId }: GraphProps) {
   /* ----- 렌더 ----- */
   return (
     <>
-      <div ref={cyRef} style={{ width: "100%", height: "600px" }} />
+      <div
+        ref={cyRef}
+        style={{
+          width: "100%",
+          height: "100%",
+          background: "linear-gradient(135deg, #f0f4ff 0%, #f9fafe 100%)",
+        }}
+      />
       <NodeContextMenu
         nodeId={ctxNodeId}
         tags={tags}

@@ -23,12 +23,12 @@ export default function ProjectDetailPage() {
   if (!project) return <div>로딩 중...</div>;
 
   return (
-    <div className="space-y-4">
-      <h1 className="text-2xl font-bold">{project.name}</h1>
-      <p className="text-gray-600">{project.description}</p>
-
-      {/* key 속성을 줘서 프로젝트가 바뀔 때 Graph를 완전히 새로 마운트 */}
-      <Graph key={pid} projectId={pid} />
+    <div className="h-full w-full flex flex-col">
+      <h1 className="text-2xl font-bold mb-2">{project.name}</h1>
+      <p className="text-gray-500 mb-4">{project.description}</p>
+      <div className="flex-1 min-h-0">  {/* ⬅️ 여기서 그래프가 flex-1로 꽉 차도록! */}
+        <Graph projectId={project.id} />
+      </div>
     </div>
   );
 }

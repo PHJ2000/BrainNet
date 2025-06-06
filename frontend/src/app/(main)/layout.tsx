@@ -23,15 +23,16 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
           </div>
         </aside>
         {/* 메인 콘텐츠 */}
-        <main className="flex-1 flex flex-col p-10 overflow-auto">
-          {/* 상단 헤더(선택, 타이틀/버튼/유저 등 넣기) */}
+        <main className="flex-1 flex flex-col h-full p-0 overflow-hidden">
+          {/* 상단 헤더 (필요시) */}
           {/* 
           <header className="mb-8 flex items-center justify-between">
             <h1 className="text-2xl font-bold text-gray-800">프로젝트</h1>
             // 유저 프로필 등
           </header>
           */}
-          <section className="flex-1 w-full max-w-5xl mx-auto">
+          {/* section → max-width/padding 제거 */}
+          <section className="flex-1 w-full h-full">
             {children}
           </section>
         </main>
