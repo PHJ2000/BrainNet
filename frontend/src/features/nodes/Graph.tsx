@@ -361,9 +361,37 @@ const handleTap = async (e: cytoscape.EventObject) => {
 
   /* 1) AI GHOST (서버에 이미 있음) → 바로 activate */
   if (cur.status === "GHOST") {
+  if (cur.label === "?") {
+    // 서버에 빈 노드로만 생성된 경우 → 사용자 입력 받아서 내용 갱신
+    const input = window.prompt("노드 내용을 입력하세요", cur.label);
+    if (!input) return;
+
+    try {
+      const saved = await updateNode(projectId, Number(cur.id), {
+        content: input,
+      });
+
+      const cy = cyInstance.current!;
+      const nodeEle = cy.$id(cur.id);
+      nodeEle.data("label", saved.content);
+      nodeEle.style("opacity", 1);
+
+      cur.label = saved.content;
+      cur.opacity = 1;
+      cur.status = "ACTIVE";
+      cur.frozen = true;
+
+      await spawnChildren(cur);
+    } catch (err) {
+      console.error(err);
+    }
+  } else {
+    // AI 생성된 노드 → 바로 activate
     await activateNodeLocal(cur);
-    return;
   }
+  return;
+}
+
 
   // /* 2) 서버에 아직 없는 노드(루트·“?”) → prompt + createNode */
   // if (cur.status === "GHOST") {
