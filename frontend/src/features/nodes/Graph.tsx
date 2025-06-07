@@ -383,7 +383,7 @@ export default function Graph({ projectId }: GraphProps) {
         depth: parent.depth + 1,
         order: idx,
         parent_id: Number(parent.id),
-
+        state: "GHOST", // 👈 추가!
       });
       const parentTags = parent.tags ?? [];
       blanks.push({

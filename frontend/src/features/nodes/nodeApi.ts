@@ -27,6 +27,7 @@ export interface NodePayload {
   depth?: number;
   order?: number;
   parent_id?: number | null;
+  state?:  string;
 }
 
 type NodeUpdatePayload = Partial<NodePayload>;

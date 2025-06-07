@@ -140,7 +140,7 @@ async def create_nodes(
     if is_root:
         # ✅ 해당 프로젝트에 루트 노드가 이미 존재하는지 확인
         result = await db.execute(
-            select(NodeORM).where(NodeORM.project_id == project_id, NodeORM.parent_id == None)
+            select(NodeORM).where(NodeORM.project_id == project_id, NodeORM.parent_id == None, NodeORM.state == NodeStateEnum.ACTIVE)
         )
         existing_root = result.scalars().first()
         if existing_root:
@@ -155,7 +155,7 @@ async def create_nodes(
         parent_id=body.parent_id if not is_root else None,
         author_id=int(uid),
         content=body.content,
-        state=NodeStateEnum.ACTIVE,
+        state=NodeStateEnum.GHOST,
         depth=body.depth or 0,
         order_index=body.order or 0,
         pos_x=body.pos_x or 0.0,
