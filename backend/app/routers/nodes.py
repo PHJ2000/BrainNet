@@ -31,7 +31,7 @@ async def get_db():
 # ── 내부 유틸: AI Ghost Stub ────────────────────────────────────────────
 async def _gen_ai_nodes(project_id: int,body: NodeCreate, prompt: str, db: AsyncSession, uid: str = Depends(_uid)) -> List[NodeOut]:
     """
-    GPT로 유령 노드 두 개를 생성하고, 두 노드 모두 반환합니다.
+    GPT로 유령 노드 한 개를 생성하고, 한 노드를 반환합니다.
     """
     nodes_created: List[NodeORM] = []
 
@@ -40,19 +40,19 @@ async def _gen_ai_nodes(project_id: int,body: NodeCreate, prompt: str, db: Async
             model="gpt-3.5-turbo",
             messages=[
                 {"role": "system", "content": "당신은 창의적인 아이디어를 제공하는 도우미입니다."},
-                {"role": "user", "content": f"다음 주제와 관련된 새로운 아이디어를 간략한 문장 형태로 두 개 작성해줘: {prompt}"}
+                {"role": "user", "content": f"다음 주제와 관련된 새로운 아이디어를 간략한 문장 형태로 한 개 작성해줘: {prompt}"}
             ],
             max_tokens=256,
             temperature=0.7,
         )
         answer = response.choices[0].message.content.strip()
-        ideas = [s for s in re.split(r'\n+', answer) if s][:2]
-        cleaned = [re.sub(r'^\d+\.\s*', '', s) for s in ideas]
+        first_line = answer.split('\n')[0]
+        ideas = [re.sub(r'^\d+\.\s*', '', first_line).strip()]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     
     # GHOST 노드 2개 생성
-    for idx, content in enumerate(cleaned):
+    for idx, content in enumerate(ideas):
         new_node = NodeORM(
             project_id=project_id,
             parent_id=body.parent_id if body.parent_id not in (None, 0, "", "0") else None,

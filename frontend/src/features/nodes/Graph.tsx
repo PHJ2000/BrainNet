@@ -336,23 +336,24 @@ export default function Graph({ projectId }: GraphProps) {
     /* ── AI 제안 호출 ── */
     const aiGhosts: NodeMeta[] = [];
     try {
-      const srvNodes: NodeOut[] = await apiCreateAINodes(projectId, parent.label, {
-        pos_x: parent.pos_x,
-        pos_y: parent.pos_y,
-        depth: parent.depth + 1,
-        order: 0,
-        parent_id: /^\d+$/.test(parent.id) ? Number(parent.id) : undefined,
-      });
-      const parentTags = parent.tags ?? [];
-      const take = Math.min(aiCnt, srvNodes.length);
-      for (let i = 0; i < take; i++) {
-        const srv = srvNodes[i];
+      // AI 노드가 필요한 개수(aiCnt)만큼 반복
+      for (let i = 0; i < aiCnt; i++) {
         const { x, y } = polarToXY(parent.pos_x, parent.pos_y, radius, angles[i]);
+        // 서버에 AI 노드 1개 생성 요청 (각각의 위치/순서/parent_id로)
+        const srvNodes: NodeOut[] = await apiCreateAINodes(projectId, parent.label, {
+          pos_x: x,
+          pos_y: y,
+          depth: parent.depth + 1,
+          order: i,
+          parent_id: /^\d+$/.test(parent.id) ? Number(parent.id) : undefined,
+        });
+        // 응답값이 항상 1개라고 가정(혹시라도 여러 개면 0번째만 사용)
+        const srv = srvNodes[0];
         aiGhosts.push({
           id: String(srv.id),
           label: srv.content,
-          pos_x: x,
-          pos_y: y,
+          pos_x: x, // 혹은 srv.pos_x
+          pos_y: y, // 혹은 srv.pos_y
           parentId: parent.id,
           depth: srv.depth,
           order: srv.order_index,
@@ -360,12 +361,12 @@ export default function Graph({ projectId }: GraphProps) {
           status: "GHOST",
           frozen: false,
           ...measureNodeSize(srv.content),
-          tags: [...parentTags],
         });
       }
     } catch (e) {
       console.error(e);
     }
+
 
     /* ── 빈(GHOST) 노드 ── */
     const blanks: NodeMeta[] = [];
