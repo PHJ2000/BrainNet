@@ -16,7 +16,7 @@ export default function NodeContextMenu({
 }: Props) {
   // nodeId === null 이면 비활성화
   return (
-    <Menu id={NODE_MENU_ID} animation="fade">
+    <Menu id={NODE_MENU_ID} animation="fade" disablePortal>
       <Submenu label="태그 달기…">
         {tags.map(t => (
           <Item key={t.id} onClick={() => onAdd(t.id)}>

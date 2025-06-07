@@ -1,6 +1,6 @@
 // features/projects/nodeApi.ts
 import { apiClient } from "@/lib/apiClient";
-
+import { NodeMeta } from "./Graph";
 /* ─────────────────────────────
    공통 타입
    ────────────────────────────*/
@@ -17,6 +17,7 @@ export interface NodeOut {
   parent_id?: number | null;
   created_at: string;
   updated_at: string;
+  tags: number[];
 }
 
 export interface NodePayload {
@@ -117,4 +118,16 @@ export async function deactivateNode(
     `/projects/${projectId}/nodes/${nodeId}/deactivate`
   );
   return data;
+}
+
+export function findChildrenIds(nodes: NodeMeta[], parentId: string): string[] {
+  let result: string[] = [];
+  for (const n of nodes) {
+    if (n.parentId === parentId) {
+      result.push(n.id);
+      // 자식의 자식도 포함 (재귀)
+      result = result.concat(findChildrenIds(nodes, n.id));
+    }
+  }
+  return result;
 }

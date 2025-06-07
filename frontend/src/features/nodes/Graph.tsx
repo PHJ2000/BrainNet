@@ -10,6 +10,7 @@ import {
   activateNode as apiActivateNode,
   updateNode,        // ✅ 추가
   fetchNodes,
+  findChildrenIds,
 } from "./nodeApi";  // ← 변경
 import {
   listTags,
@@ -143,6 +144,9 @@ function measureNodeSize(label: string, maxWidth = 220, font = "bold 18px Arial"
 export default function Graph({ projectId }: GraphProps) {
   const cyRef = useRef<HTMLDivElement>(null);
   const cyInstance = useRef<Core | null>(null);
+  const [tags, setTags] = useState<Tag[]>([]);
+  const [tagPopoverOpen, setTagPopoverOpen] = useState(false); // 태그 팝오버/모달
+  const [highlightTag, setHighlightTag] = useState<string | null>(null); // 현재 하이라이팅할 태그 id
 
   /* ----- 상태 ----- */
   const [nodes, setNodes] = useState<NodeMeta[]>([]);
@@ -151,10 +155,23 @@ export default function Graph({ projectId }: GraphProps) {
     nodesRef.current = nodes;
   }, [nodes]);
 
+  /* ----- 태그 초기 로드 ----- */
+  useEffect(() => {
+    listTags(projectId)
+      .then((tagList) => {
+        // id를 string으로 변환해서 저장
+        setTags(tagList.map(tag => ({ ...tag, id: String(tag.id) })));
+      })
+      .catch((e) => console.error("listTags", e));
+  }, [projectId]);
+
   /* fetchNodes → setNodes 하는 useEffect 안을 이렇게 교체 */
   useEffect(() => {
     fetchNodes(projectId)
       .then(async (list) => {
+        if (list && Array.isArray(list) && list.length > 0) {
+          console.log("서버에서 받은 노드 리스트:", list);
+        }
         const metas: NodeMeta[] = list.map((n) => {
           const { width, height } = measureNodeSize(n.content ?? "");
           return {
@@ -170,6 +187,7 @@ export default function Graph({ projectId }: GraphProps) {
             frozen: true,
             width,            // ⬅️ 반영
             height,           // ⬅️ 반영
+            tags: (n.tags ?? []).map(String),
           };
         });
 
@@ -184,17 +202,30 @@ export default function Graph({ projectId }: GraphProps) {
       .catch(console.error);
   }, [projectId]);
 
-  const [tags, setTags] = useState<Tag[]>([]);
+
   const [ctxNodeId, setCtxNodeId] = useState<string | null>(null);
   const showMenu = useNodeMenu();
 
-  /* ----- 태그 초기 로드 ----- */
-  useEffect(() => {
-    listTags(projectId)
-      .then(setTags)
-      .catch((e) => console.error("listTags", e));
-  }, [projectId]);
 
+  //태그 하이라이팅
+  useEffect(() => {
+    const cy = cyInstance.current;
+    if (!cy) return;
+
+    // 모두 초기화(하이라이트 해제)
+    cy.nodes().forEach((node) => {
+      node.removeClass("highlighted");
+    });
+
+    if (highlightTag) {
+      cy.nodes().forEach((node) => {
+        const nodeData = nodesRef.current.find((n) => n.id === node.id());
+        if (nodeData?.tags?.includes(highlightTag)) {
+          node.addClass("highlighted");
+        }
+      });
+    }
+  }, [highlightTag]);
   /* ----- util ----- */
   const radius = 150;
   const polarToXY = (cx: number, cy: number, r: number, rad: number) => ({
@@ -209,7 +240,7 @@ export default function Graph({ projectId }: GraphProps) {
       // 이미 width, height가 있으므로 재계산 필요 없음
       return [
         {
-          data: { id: n.id, label: n.label, width: n.width, height: n.height },
+          data: { id: n.id, label: n.label, width: n.width, height: n.height, tag: (n.tags ?? []).map(String) },
           position: { x: n.pos_x, y: n.pos_y },
           style: { opacity: n.opacity ?? 1 },
         },
@@ -245,11 +276,16 @@ export default function Graph({ projectId }: GraphProps) {
       }
     }
 
+    // 현재 노드와 모든 자식 노드 id 구하기
+    const allNodeIds = [ctxNodeId, ...findChildrenIds(nodesRef.current, ctxNodeId)];
+
+
     try {
+      // 모든 노드에 태그를 attachW
       await attachTag(projectId, realId, ctxNodeId);
       setNodes((ns) =>
         ns.map((n) =>
-          n.id === ctxNodeId
+          allNodeIds.includes(n.id)
             ? { ...n, tags: [...(n.tags ?? []), realId] }
             : n
         )
@@ -261,11 +297,15 @@ export default function Graph({ projectId }: GraphProps) {
 
   const handleRemoveTag = async (tagId: string) => {
     if (!ctxNodeId) return;
+
+    // 현재 노드와 모든 자식 노드 id 구하기
+    const allNodeIds = [ctxNodeId, ...findChildrenIds(nodesRef.current, ctxNodeId)];
+
     try {
-      await detachTag(projectId, tagId, ctxNodeId);
+      await attachTag(projectId, tagId, ctxNodeId);
       setNodes((ns) =>
         ns.map((n) =>
-          n.id === ctxNodeId
+          allNodeIds.includes(n.id)
             ? { ...n, tags: (n.tags ?? []).filter((t) => t !== tagId) }
             : n
         )
@@ -303,7 +343,7 @@ export default function Graph({ projectId }: GraphProps) {
         order: 0,
         parent_id: /^\d+$/.test(parent.id) ? Number(parent.id) : undefined,
       });
-
+      const parentTags = parent.tags ?? [];
       const take = Math.min(aiCnt, srvNodes.length);
       for (let i = 0; i < take; i++) {
         const srv = srvNodes[i];
@@ -320,6 +360,7 @@ export default function Graph({ projectId }: GraphProps) {
           status: "GHOST",
           frozen: false,
           ...measureNodeSize(srv.content),
+          tags: [...parentTags],
         });
       }
     } catch (e) {
@@ -343,7 +384,7 @@ export default function Graph({ projectId }: GraphProps) {
         parent_id: Number(parent.id),
 
       });
-
+      const parentTags = parent.tags ?? [];
       blanks.push({
         id: String(blank.id),
         label: "?",          // UI 표시만 ?
@@ -356,6 +397,7 @@ export default function Graph({ projectId }: GraphProps) {
         status: "GHOST",     // 프론트에서 GHOST 표현
         frozen: false,
         ...measureNodeSize("?"),
+        tags: [...parentTags],
       });
     }
 
@@ -367,6 +409,8 @@ export default function Graph({ projectId }: GraphProps) {
       return next;
     });
     addToCy(children);
+
+
 
     parent.frozen = true;
     parent.generated = true;
@@ -567,6 +611,18 @@ export default function Graph({ projectId }: GraphProps) {
           }
         },
         {
+          selector: "node.highlighted",
+          style: {
+            "background-color": "#fcd34d", // 노란색 하이라이트
+            "border-color": "#fbbf24",
+            "border-width": 5,
+            "z-index": 9999,
+            "transition-property": "background-color, border-color, color",
+            "transition-duration": "0.18s",
+            "box-shadow": "0 0 22px 5px #fde68a77",
+          }
+        },
+        {
           "selector": "edge",
           "style": {
             "width": 2.5,
@@ -599,14 +655,20 @@ export default function Graph({ projectId }: GraphProps) {
     });
 
     cy.on("cxttap", "node", (ev) => {
-      ev.originalEvent.preventDefault();
-      ev.originalEvent.stopPropagation();
       const nodeId = ev.target.id();
       setCtxNodeId(nodeId);
-      showMenu({
-        event: ev.originalEvent,  // 반드시 native 이벤트 전달!
-        props: { nodeId },
-      });
+      const nativeEvent = ev.originalEvent;
+      if (nativeEvent) {
+        nativeEvent.preventDefault();
+        nativeEvent.stopPropagation();
+        // next tick에 showMenu 실행 (state 반영 이후)
+        setTimeout(() => {
+          showMenu({
+            event: nativeEvent,
+            props: { nodeId },
+          });
+        }, 0);
+      }
     });
 
     return () => {
@@ -625,6 +687,60 @@ export default function Graph({ projectId }: GraphProps) {
           background: "linear-gradient(135deg, #f0f4ff 0%, #f9fafe 100%)",
         }}
       />
+      {/* 플로팅 버튼 */}
+      <button
+        style={{
+          position: "absolute",
+          bottom: 28,
+          right: 32,
+          zIndex: 10,
+          padding: "12px 30px",
+          borderRadius: "9999px",
+          background: "linear-gradient(135deg, #6366f1 60%, #a78bfa 100%)",
+          color: "white",
+          fontWeight: 800,
+          fontSize: 20,
+          letterSpacing: 2,
+          boxShadow: "0 4px 18px 0 rgba(99,102,241,0.13)",
+          border: "none",
+          cursor: "pointer",
+          transition: "filter .18s",
+          textTransform: "uppercase",
+        }}
+        onClick={() => setTagPopoverOpen((open) => !open)}
+      >
+        TAG
+      </button>
+
+      {/* 태그 리스트 팝오버 */}
+      {
+        tagPopoverOpen && (
+          <div
+            className="absolute bottom-[84px] right-8 z-30 bg-white rounded-xl shadow-xl border w-56 flex flex-col p-2"
+            style={{ animation: "fadeIn .22s" }}
+          >
+            {tags.length === 0 ? (
+              <div className="py-6 text-center text-gray-400">태그 없음</div>
+            ) : (
+              tags.map((tag) => (
+                <button
+                  key={tag.id}
+                  className={`
+              w-full px-4 py-2 my-1 rounded text-left font-medium
+              ${highlightTag === tag.id ? "bg-indigo-100 text-indigo-700" : "hover:bg-gray-50"}
+            `}
+                  onClick={() =>
+                    setHighlightTag((prev) => (prev === tag.id ? null : tag.id))
+                  }
+                >
+                  {tag.name}
+                </button>
+              ))
+            )}
+          </div>
+        )
+      }
+
       <NodeContextMenu
         nodeId={ctxNodeId}
         tags={tags}

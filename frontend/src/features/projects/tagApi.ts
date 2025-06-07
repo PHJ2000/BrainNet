@@ -6,3 +6,5 @@ export const updateTag  = (pid: string | number, tid: string | number, body: any
 export const deleteTag  = (pid: string | number, tid: string | number) => apiClient.delete(`/projects/${pid}/tags/${tid}`);
 export const attachTag  = (pid: string | number, tid: string | number, nid: string | number) => apiClient.post(`/projects/${pid}/tags/${tid}/nodes/${nid}`).then(r=>r.data);
 export const detachTag  = (pid: string | number, tid: string | number, nid: string | number) => apiClient.delete(`/projects/${pid}/tags/${tid}/nodes/${nid}`).then(r=>r.data);
+
+

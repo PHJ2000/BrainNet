@@ -98,7 +98,23 @@ async def list_nodes(
 
     result = await db.execute(query)
     nodes = result.scalars().all()
-    return [NodeOut.from_orm(n) for n in nodes]
+    node_ids = [n.id for n in nodes]
+    tag_result = await db.execute(
+        select(TagNode.node_id, TagNode.tag_id).where(TagNode.node_id.in_(node_ids))
+    )
+    tag_map = {}
+    for node_id, tag_id in tag_result.all():
+        tag_map.setdefault(node_id, []).append(tag_id)
+
+    # NodeOut에 tags 필드 추가해서 반환
+    outs = []
+    for n in nodes:
+        out = NodeOut.from_orm(n)
+        out.tags = tag_map.get(n.id, [])
+        outs.append(out)
+
+    return outs
+    #return [NodeOut.from_orm(n) for n in nodes]
 
 
 @router.post("", response_model=List[NodeOut], status_code=status.HTTP_201_CREATED)

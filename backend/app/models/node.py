@@ -1,6 +1,6 @@
 # backend/app/models/node.py
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional,List
 from datetime import datetime
 
 class NodeCreate(BaseModel):
@@ -32,6 +32,8 @@ class NodeOut(BaseModel):
     parent_id: Optional[int] = None
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    tags: List[int] =[]
+
 
     class Config:
         from_attributes = True
