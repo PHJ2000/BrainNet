@@ -11,6 +11,7 @@ class NodeCreate(BaseModel):
     order: Optional[int] = 0
     ai_prompt: Optional[str] = None
     parent_id: Optional[int] = None
+    state: Optional[str] = None  # ← 기본값은 ACTIVE, 입력 가능
 
 class NodeUpdate(BaseModel):
     content: Optional[str] = None
