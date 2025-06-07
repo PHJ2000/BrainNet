@@ -302,7 +302,7 @@ export default function Graph({ projectId }: GraphProps) {
     const allNodeIds = [ctxNodeId, ...findChildrenIds(nodesRef.current, ctxNodeId)];
 
     try {
-      await attachTag(projectId, tagId, ctxNodeId);
+      await detachTag(projectId, tagId, ctxNodeId);
       setNodes((ns) =>
         ns.map((n) =>
           allNodeIds.includes(n.id)
