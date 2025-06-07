@@ -246,7 +246,9 @@ async def attach_tag(
     - ensure_member 검사
     - 이미 연결되어 있으면 409 에러
     """
+    t0 = time.time()
     await _m(int(uid), project_id, db)
+    t1 = time.time()
 
     # (1) Tag가 project_id에 속하는지 확인
     tag_row = await db.execute(
@@ -255,6 +257,7 @@ async def attach_tag(
     tag = tag_row.scalar_one_or_none()
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
+    t2 = time.time()
 
     # (2) Node가 project_id에 속하는지 확인
     node_row = await db.execute(
@@ -263,6 +266,7 @@ async def attach_tag(
     node = node_row.scalar_one_or_none()
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
+    t3 = time.time()
         
     
 
@@ -275,9 +279,11 @@ async def attach_tag(
     )
     if exist.scalar_one_or_none():
         raise HTTPException(status_code=409, detail="Already attached")
+    t4 = time.time()
     
     # (4) 모든 자손 노드 id 수집
     node_ids = await get_descendant_node_ids(node_id,db)
+    t5 = time.time()
 
     # (5) 이미 연결된 관계는 제외하고 bulk insert
     # 이미 연결된 (tag_id, node_id) 목록 조회
@@ -289,18 +295,19 @@ async def attach_tag(
         )
     )
     already_attached = set(row[0] for row in exist_rows.all())
+    t6 = time.time()
 
     # 신규 연결 대상만 추림
     # 연결
     to_attach = [nid for nid in node_ids if nid not in already_attached]
     db.add_all([TagNodeORM(tag_id=tag_id, node_id=nid) for nid in to_attach])
     await db.commit()
-
+    t7 = time.time()
     
- 
+    print(f"타이밍: 권한:{t1-t0:.3f}s, 태그:{t2-t1:.3f}s, 노드:{t3-t2:.3f}s, 존재확인:{t4-t3:.3f}s, 자손수집:{t5-t4:.3f}s, 조희:{t6-t5:.3f}s, 연결:{t7-t6:.3f} 총합:{t7-t0:.3f}s")
     return {"tag_id": tag_id, "node_id": node_id, "status": "attached"}
 
-
+import time
 # ── 태그-노드 연결 해제 (detach) ────────────────────────────────────
 @router.delete(
     "/{tag_id}/nodes/{node_id}",
@@ -319,7 +326,9 @@ async def detach_tag(
     - ensure_member 검사
     - 연결된 적 없으면 400 에러
     """
+    t0 = time.time()
     await _m(int(uid), project_id, db)
+    t1 = time.time()
 
     # (1) Tag 존재 여부 검사
     tag_row = await db.execute(
@@ -328,6 +337,7 @@ async def detach_tag(
     tag = tag_row.scalar_one_or_none()
     if not tag:
         raise HTTPException(status_code=404, detail="Tag not found")
+    t2 = time.time()
 
     # (2) Node 존재 여부 검사
     node_row = await db.execute(
@@ -336,6 +346,7 @@ async def detach_tag(
     node = node_row.scalar_one_or_none()
     if not node:
         raise HTTPException(status_code=404, detail="Node not found")
+    t3 = time.time()
 
     # (3) TagNode 연결 여부 검사
     exist = await db.execute(
@@ -346,9 +357,11 @@ async def detach_tag(
     )
     if not exist.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Node not tagged")
+    t4 = time.time()
 
     # (4) 모든 자손 노드 id 수집 (자기 자신 포함)
     node_ids = await get_descendant_node_ids(node_id,db)  # ← 앞서 정의한 함수 재사용
+    t5 = time.time()
 
     # (5) 실제로 연결되어 있던 TagNodeORM 삭제 (bulk)
     await db.execute(
@@ -358,6 +371,10 @@ async def detach_tag(
         )
     )
     await db.commit()
+    t6 = time.time()
+
+    print(f"타이밍: 권한:{t1-t0:.3f}s, 태그:{t2-t1:.3f}s, 노드:{t3-t2:.3f}s, 존재확인:{t4-t3:.3f}s, 자손수집:{t5-t4:.3f}s, 삭제:{t6-t5:.3f}s, 총합:{t6-t0:.3f}s")
+
     return {"tag_id": tag_id, "node_id": node_id, "status": "detached"}
 
 # 자식노드 리스트를 전부 반환하는 메소드

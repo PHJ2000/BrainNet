@@ -155,6 +155,16 @@ export default function Graph({ projectId }: GraphProps) {
     nodesRef.current = nodes;
   }, [nodes]);
 
+  const updateNodesAndCy = (updater: (arg0: NodeMeta[]) => any) => {
+    setNodes((prev) => {
+      const next = typeof updater === "function" ? updater(prev) : updater;
+      addToCy(next);
+      nodesRef.current = next;
+      return next;
+    });
+};
+
+
   /* ----- 태그 초기 로드 ----- */
   useEffect(() => {
     listTags(projectId)
@@ -283,7 +293,7 @@ export default function Graph({ projectId }: GraphProps) {
     try {
       // 모든 노드에 태그를 attachW
       await attachTag(projectId, realId, ctxNodeId);
-      setNodes((ns) =>
+      updateNodesAndCy((ns) =>
         ns.map((n) =>
           allNodeIds.includes(n.id)
             ? { ...n, tags: [...(n.tags ?? []), realId] }
@@ -303,7 +313,7 @@ export default function Graph({ projectId }: GraphProps) {
 
     try {
       await detachTag(projectId, tagId, ctxNodeId);
-      setNodes((ns) =>
+      updateNodesAndCy((ns) =>
         ns.map((n) =>
           allNodeIds.includes(n.id)
             ? { ...n, tags: (n.tags ?? []).filter((t) => t !== tagId) }
