@@ -136,7 +136,7 @@ AI 추천으로 **창의적 사고의 폭**을 넓히고, 노드 색상·두께�
 > **스키마** – Swagger UI 상단의 `Schemas` 탭에서  
 > `ProjectOut`, `NodeOut`, `TagOut`, `VoteOut` 등 응답 구조를 확인할 수 있습니다.
 
-## ERD 다이어 그램
+## ERD 다이어그램
 
 ![로고](./images/ERD.png)
 
