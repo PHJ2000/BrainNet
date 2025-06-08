@@ -585,54 +585,57 @@ export default function Graph({ projectId }: GraphProps) {
       layout: { name: "preset" },
       "style": [
         {
-          "selector": "node",
-          "style": {
+          selector: "node",
+          style: {
             "shape": "roundrectangle",
-            // ACTIVE: "#f1f5fe"(연파랑), GHOST: "#e6f0ff"(밝은 블루톤)
-            "background-color": "mapData(status, 'ACTIVE', '#f1f5fe', 'GHOST', '#e6f0ff')",
-            "border-width": 0,
+            "background-color": "mapData(status, 'ACTIVE', '#eef2ff', 'GHOST', '#f8fafc')",
+            "border-width": 1,
+            "border-color": "#d1d5db", // 테두리 흐리게
             "label": "data(label)",
-            // ACTIVE: "#374151", GHOST: "#6366f1"(인디고)이나 "#94a3b8"(연그레이블루)
-            "color": "mapData(status, 'ACTIVE', '#374151', 'GHOST', '#94a3b8')",
+            "color": "mapData(status, 'ACTIVE', '#1e293b', 'GHOST', '#64748b')",
             "font-weight": "600",
-            "font-size": 17,
+            "font-size": 16,
             "letter-spacing": "0.01em",
             "text-valign": "center",
             "text-halign": "center",
-            "padding": "20px",
-            "border-radius": "19px",
+            "padding": "14px",
+            "border-radius": "16px",
             "width": "data(width)",
             "height": "data(height)",
             "text-wrap": "wrap",
             "text-max-width": 210,
-            "opacity": "mapData(status, 'ACTIVE', 1, 'GHOST', 0.90)",   // 더 밝게
-            "transition-property": "background-color, color, opacity",
-            "transition-duration": "0.2s"
+            "opacity": "mapData(status, 'ACTIVE', 1, 'GHOST', 0.88)",
+            "transition-property": "background-color, color, opacity, border-color",
+            "transition-duration": "0.22s",
+            "box-shadow": "0 2px 6px rgba(0,0,0,0.03)"
           }
-        },
+        }
+,
         {
-          "selector": "node:selected",
-          "style": {
-            "background-color": "#c7d2fe", // 강조색
-            "box-shadow": "0 2px 32px 0 rgba(99, 102, 241, 0.17)",
-            "color": "#3730a3",
-            "border-width": 2,
+          selector: "node:selected",
+          style: {
+            "background-color": "#dbeafe",
             "border-color": "#6366f1",
-            "opacity": 1,
+            "border-width": 3,
+            "color": "#1e40af",
+            "box-shadow": "0 0 20px rgba(99, 102, 241, 0.25)",
+            "z-index": 9999,
           }
-        },
+        }
+,
         {
           selector: "node.highlighted",
           style: {
-            "background-color": "#fcd34d", // 노란색 하이라이트
-            "border-color": "#fbbf24",
-            "border-width": 5,
-            "z-index": 9999,
-            "transition-property": "background-color, border-color, color",
+            "background-color": "#fef9c3",
+            "border-color": "#facc15",
+            "border-width": 4,
+            "color": "#92400e",
             "transition-duration": "0.18s",
-            "box-shadow": "0 0 22px 5px #fde68a77",
+            "box-shadow": "0 0 12px 3px #fde68a",
+            "z-index": 10000,
           }
-        },
+        }
+,
         {
           "selector": "edge",
           "style": {

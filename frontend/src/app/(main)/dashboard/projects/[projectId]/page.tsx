@@ -24,8 +24,12 @@ export default function ProjectDetailPage() {
 
   return (
     <div className="h-full w-full flex flex-col">
-      <h1 className="text-2xl font-bold mb-2">{project.name}</h1>
-      <p className="text-gray-500 mb-4">{project.description}</p>
+      <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 drop-shadow-sm tracking-tight mb-2">
+        {project.name}
+      </h1>
+      {/* <p className="text-sm text-gray-600 mb-4 leading-relaxed">
+        {project.description}
+      </p> */}
       <div className="flex-1 min-h-0">  {/* ⬅️ 여기서 그래프가 flex-1로 꽉 차도록! */}
         <Graph projectId={project.id} />
       </div>
