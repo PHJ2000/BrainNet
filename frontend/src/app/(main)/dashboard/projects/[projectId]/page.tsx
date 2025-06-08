@@ -23,8 +23,16 @@ export default function ProjectDetailPage() {
   if (!project) return <div>로딩 중...</div>;
 
   return (
-    <div className="h-full w-full flex flex-col">
-      <h1 className="text-3xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 via-indigo-500 to-purple-600 drop-shadow-sm tracking-tight mb-2">
+    <div className="h-full w-full flex flex-col"
+    style={{
+    backgroundImage: 'linear-gradient(135deg, #f0f4ff 0%, #f9fafe 100%)',
+  }}>
+      <h1
+  className="text-4xl font-bold text-transparent text-center px-6 py-4 bg-clip-text drop-shadow-md"
+  style={{
+    backgroundImage: 'linear-gradient(135deg, #2563eb, #7c3aed)',
+  }}
+>
         {project.name}
       </h1>
       {/* <p className="text-sm text-gray-600 mb-4 leading-relaxed">

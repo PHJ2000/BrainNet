@@ -237,7 +237,7 @@ export default function Graph({ projectId }: GraphProps) {
     }
   }, [highlightTag]);
   /* ----- util ----- */
-  const radius = 150;
+  const radius = 280;
   const polarToXY = (cx: number, cy: number, r: number, rad: number) => ({
     x: cx + r * Math.cos(rad),
     y: cy + r * Math.sin(rad),
@@ -486,64 +486,6 @@ export default function Graph({ projectId }: GraphProps) {
       return;
     }
 
-
-    // /* 2) 서버에 아직 없는 노드(루트·“?”) → prompt + createNode */
-    // if (cur.status === "GHOST") {
-    //   const input = window.prompt("노드 내용을 입력하세요", cur.label);
-    //   if (!input) return;
-
-    //   try {
-    //     const saved = await createNode(projectId, {
-    //       content: input,
-    //       x: cur.x,
-    //       y: cur.y,
-    //       depth: cur.depth,
-    //       order: cur.order,
-    //       parent_id: cur.parentId ? Number(cur.parentId) : null,
-    //     });
-
-    //     /* ──── 🔽 여기부터 기존 코드 대신 넣으세요 ──── */
-    //     const newId = String(saved.id);
-    //     const cy = cyInstance.current!;
-    //     const oldEle   = cy.$id(oldId);          // placeholder
-    //     const position = oldEle.position();      // 좌표 보존
-
-    //     // ① placeholder 삭제
-    //     oldEle.remove();
-
-    //     // ② 새 노드 + (부모 엣지) 추가
-    //     const newEles: ElementDefinition[] = [
-    //       { data: { id: newId, label: saved.content }, position },
-    //     ];
-    //     if (cur.parentId) {
-    //       newEles.push({
-    //         data: {
-    //           id: `e-${cur.parentId}-${newId}`,
-    //           source: cur.parentId,
-    //           target: newId,
-    //         },
-    //       });
-    //     }
-    //     cy.add(newEles);
-
-    //     // ③ 프론트 상태 업데이트
-    //     cur.id     = newId;
-    //     cur.label  = saved.content;
-    //     cur.status = "ACTIVE";
-    //     cur.opacity = 1;
-    //     cur.frozen  = true;
-
-    //     // ④ 자식 노드 생성으로 이어가기
-    //     await spawnChildren(cur);
-
-    //     /* ──── 🔼 여기까지 ──── */
-
-    //   } catch (err) {
-    //     console.error(err);
-    //   }
-    //   return;
-    // }
-
     /* 3) 이미 ACTIVE + 숫자 ID → 라벨 수정(updateNode) */
     const newLabel = window.prompt("노드 내용을 수정하세요", cur.label);
     if (!newLabel || newLabel === cur.label) return;
@@ -639,7 +581,7 @@ export default function Graph({ projectId }: GraphProps) {
         {
           "selector": "edge",
           "style": {
-            "width": 2.5,
+            "width": 3.5,
             "line-color": "#b4b8f5",
             "target-arrow-color": "#b4b8f5",
             "target-arrow-shape": "triangle",

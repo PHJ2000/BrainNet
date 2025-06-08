@@ -101,14 +101,14 @@ async def create_project(
         state=NodeStateEnum.ACTIVE,  # ✅ Enum import 필요
         depth=0,
         order_index=0,
-        pos_x=700,
+        pos_x=800,
         pos_y=400,
     )
     db.add(root)
 
     # ( 프로젝트 생성 후, 멤버십 추가 )
     membership = ProjectUserRole(
-        project_id=new_proj.id,x
+        project_id=new_proj.id,
         user_id=int(uid),
         role="OWNER",          # RoleType enum 중 OWNER
     )
