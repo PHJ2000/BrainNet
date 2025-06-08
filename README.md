@@ -61,7 +61,7 @@ AI 추천으로 **창의적 사고의 폭**을 넓히고, 노드 색상·두께�
 ---
 
 ## F. 프로젝트 개발 결과물 소개 (+ 다이어그램)
-![로고](./images/logo.png)
+![로고](./images/diagram.png)
 
 프로젝트는 크게 프론트엔드와 백엔드로 구성되어 있으며, 각 서비스는 Docker 컨테이너 환경에서 구동됩니다.
 
@@ -138,7 +138,7 @@ AI 추천으로 **창의적 사고의 폭**을 넓히고, 노드 색상·두께�
 
 ## ERD 다이어 그램
 
-
+![로고](./images/ERD.png)
 
 ### 디렉터리 구조
 
@@ -154,12 +154,13 @@ BRAINNET
 │  │  └─ utils/
 │  └─ envexample
 └─ frontend
-    ├─ public/           # 정적 리소스
-    └─ src/
-        ├─ app/          # Next.js 라우트(dashboard, login, register)
-        ├─ features/     # Zustand 상태·API 모듈
-        ├─ lib/          # axios 래퍼, 헬퍼
-        └─ types/        # 공용 TS 타입
+│   ├─ public/           # 정적 리소스
+│   └─ src/
+│       ├─ app/          # Next.js 라우트(dashboard, login, register)
+│       ├─ features/     # Zustand 상태·API 모듈
+│       ├─ lib/          # axios 래퍼, 헬퍼
+│       └─ types/        # 공용 TS 타입
+└─ images       # README 이미지 플더
 
 ```
 
