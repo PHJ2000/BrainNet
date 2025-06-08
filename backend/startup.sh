@@ -9,5 +9,6 @@ done
 echo "Running alembic upgrade head..."
 poetry run alembic upgrade head
 
+
 echo "Starting server..."
 poetry run uvicorn app.main:app --host 0.0.0.0 --port 8000

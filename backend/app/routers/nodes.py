@@ -68,6 +68,15 @@ async def _gen_ai_nodes(project_id: int,body: NodeCreate, prompt: str, db: Async
         await db.flush()
         nodes_created.append(new_node)
 
+    if body.parent_id is not None:
+        parent_tags = await db.execute(
+            select(TagNode.tag_id).where(TagNode.node_id == body.parent_id)
+        )
+        for (tag_id,) in parent_tags.all():
+            tagnode = TagNode(tag_id=tag_id, node_id=new_node.id)
+            db.add(tagnode)
+        await db.commit()
+
     await db.commit()
     # 두 노드 모두 refresh
     for node in nodes_created:
