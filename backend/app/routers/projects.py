@@ -28,7 +28,7 @@ from app.models.project import ProjectOut
 from app.core.security import get_current_user_id as _uid
 from app.utils.helpers import ensure_owner as _o
 from app.db.models.project import Project as ProjectORM
-from app.db.models.node import Node as NodeORM
+from app.db.models.node import Node as NodeORM, NodeStateEnum  # ← Enum 같이 import
 from app.db.models.tag import Tag as TagORM
 from app.db.models.tag_node import TagNode
 from app.db.session import AsyncSessionLocal
@@ -92,6 +92,20 @@ async def create_project(
     )
     db.add(new_proj)
     await db.flush()  # new_proj.id를 얻기 위해 flush
+
+# 🌟 루트 노드 즉시 생성
+    root = NodeORM(
+        project_id=new_proj.id,      # ✅ proj → new_proj
+        author_id=int(uid),
+        content="주제를 입력하세요",
+        state=NodeStateEnum.ACTIVE,  # ✅ Enum import 필요
+        depth=0,
+        order_index=0,
+        pos_x=800,
+        pos_y=400,
+    )
+    db.add(root)
+
     # ( 프로젝트 생성 후, 멤버십 추가 )
     membership = ProjectUserRole(
         project_id=new_proj.id,
