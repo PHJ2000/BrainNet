@@ -632,6 +632,21 @@ export default function Graph({ projectId }: GraphProps) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const handleSaveImage = () => {
+  if (!cyInstance.current) return;
+  const blob = cyInstance.current.png({ output: "blob", bg: "white", scale: 2 });
+
+  if (blob instanceof Blob) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "graph.png";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+};
+
   /* ----- 렌더 ----- */
   return (
     <>
@@ -667,6 +682,30 @@ export default function Graph({ projectId }: GraphProps) {
       >
         TAG
       </button>
+
+        <button
+    style={{
+      position: "absolute",
+      bottom: 28,
+      right: 160, // TAG 버튼보다 왼쪽으로
+      zIndex: 10,
+      padding: "12px 30px",
+      borderRadius: "9999px",
+      background: "linear-gradient(135deg, #10b981 60%, #34d399 100%)",
+      color: "white",
+      fontWeight: 800,
+      fontSize: 20,
+      letterSpacing: 2,
+      boxShadow: "0 4px 18px 0 rgba(16,185,129,0.15)",
+      border: "none",
+      cursor: "pointer",
+      transition: "filter .18s",
+      textTransform: "uppercase",
+    }}
+    onClick={handleSaveImage}
+  >
+    SAVE
+  </button>
 
       {/* 태그 리스트 팝오버 */}
       {
@@ -710,4 +749,5 @@ export default function Graph({ projectId }: GraphProps) {
       />
     </>
   );
+
 }
