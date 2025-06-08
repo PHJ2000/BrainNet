@@ -358,6 +358,7 @@ export default function Graph({ projectId }: GraphProps) {
           parent_id: /^\d+$/.test(parent.id) ? Number(parent.id) : undefined,
         });
         // 응답값이 항상 1개라고 가정(혹시라도 여러 개면 0번째만 사용)
+        const parentTags = parent.tags ?? [];
         const srv = srvNodes[0];
         aiGhosts.push({
           id: String(srv.id),
@@ -371,6 +372,7 @@ export default function Graph({ projectId }: GraphProps) {
           status: "GHOST",
           frozen: false,
           ...measureNodeSize(srv.content),
+          tags: parentTags
         });
       }
     } catch (e) {
