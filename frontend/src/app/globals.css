@@ -4,8 +4,8 @@
 @tailwind utilities;
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* --background: #ffffff00;
+  --foreground: #17171700; */
 }
 
 @theme inline {
@@ -22,8 +22,16 @@
   }
 }
 
-body {
-  background: var(--background);
+/* body {
+  background: transparent;
   color: var(--foreground);
+} */
+
+/* html, body, main {
+  background: transparent !important;
   font-family: Arial, Helvetica, sans-serif;
+} */
+
+div.__cytoscape_container canvas {
+  z-index: 0 !important;
 }
